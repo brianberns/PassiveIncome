@@ -1,0 +1,32 @@
+# Build output
+bin/
+obj/
+
+# IDE / editor
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# Claude Code per-machine settings (allow rules with absolute paths, etc.)
+**/.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# F# / .NET interactive
+.fsi-history
+
+# SQLite (paper-trading state — per-machine, never committed)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs / scratch
+*.log
+*.swp
+*~
