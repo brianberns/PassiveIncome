@@ -63,13 +63,12 @@ module Agent =
             w (sprintf "  %s: $%.4f (24h: %+.2f%%, 7d: %+.2f%%)"
                    (Asset.value p.Asset) (Usd.value p.PriceUsd) p.Change24hPct p.Change7dPct)
         w ""
-        w "## News (recent headlines, with sentiment votes positive/negative/important)"
+        w "## News (recent headlines)"
         if List.isEmpty news then
             w "  (no fresh news this cycle)"
         else
             for n in news |> List.truncate 20 do
-                w (sprintf "  [%s | +%d/-%d/!%d] %s"
-                       n.Source n.VotesPositive n.VotesNegative n.VotesImportant n.Title)
+                w (sprintf "  [%s] %s" n.Source n.Title)
         w ""
         w "## Recent trades (last 24h)"
         if List.isEmpty recentTrades then

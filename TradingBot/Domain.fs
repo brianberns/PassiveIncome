@@ -43,14 +43,11 @@ module TradeAction =
         | Buy -> "Buy" | Sell -> "Sell" | Hold -> "Hold"
 
 type NewsItem = {
-    Id             : string
-    Source         : string
-    Title          : string
-    Url            : string
-    At             : DateTimeOffset
-    VotesPositive  : int
-    VotesNegative  : int
-    VotesImportant : int
+    Id     : string
+    Source : string
+    Title  : string
+    Url    : string
+    At     : DateTimeOffset
 }
 
 type PriceSnapshot = {

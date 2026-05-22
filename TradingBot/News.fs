@@ -45,14 +45,11 @@ module News =
                               |> Option.defaultValue ""
                           let id =
                               if String.IsNullOrEmpty item.Id then link else item.Id
-                          { Id             = id
-                            Source         = sourceName
-                            Title          = title
-                            Url            = link
-                            At             = item.PublishDate
-                            VotesPositive  = 0
-                            VotesNegative  = 0
-                            VotesImportant = 0 } ]
+                          { Id     = id
+                            Source = sourceName
+                            Title  = title
+                            Url    = link
+                            At     = item.PublishDate } ]
                 return items
             with _ ->
                 // Per-feed failures are tolerated — one broken feed should not

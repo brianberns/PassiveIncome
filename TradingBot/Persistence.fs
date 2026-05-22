@@ -70,10 +70,7 @@ module Persistence =
             source TEXT NOT NULL,
             ts TEXT NOT NULL,
             title TEXT NOT NULL,
-            url TEXT NOT NULL,
-            votes_positive INTEGER NOT NULL,
-            votes_negative INTEGER NOT NULL,
-            votes_important INTEGER NOT NULL
+            url TEXT NOT NULL
         );
     """
 
@@ -107,6 +104,14 @@ module Persistence =
         {
             Init = fun startingCash ->
                 exec schemaSql [] |> ignore
+                // Migrate DBs created before the RSS pivot: drop the vestigial
+                // CryptoPanic sentiment-vote columns. Idempotent — no-op once gone.
+                let newsCols =
+                    query "PRAGMA table_info(news_seen)" [] (fun r -> r.GetString(1))
+                if List.contains "votes_positive" newsCols then
+                    exec "ALTER TABLE news_seen DROP COLUMN votes_positive"  [] |> ignore
+                    exec "ALTER TABLE news_seen DROP COLUMN votes_negative"  [] |> ignore
+                    exec "ALTER TABLE news_seen DROP COLUMN votes_important" [] |> ignore
                 let count =
                     use cmd = conn.CreateCommand()
                     cmd.CommandText <- "SELECT COUNT(*) FROM portfolio"
@@ -187,18 +192,13 @@ module Persistence =
 
             TryRecordNews = fun n ->
                 let rows =
-                    exec """INSERT OR IGNORE INTO news_seen
-                            (id, source, ts, title, url,
-                             votes_positive, votes_negative, votes_important)
-                            VALUES ($id, $src, $ts, $t, $u, $vp, $vn, $vi)"""
+                    exec """INSERT OR IGNORE INTO news_seen (id, source, ts, title, url)
+                            VALUES ($id, $src, $ts, $t, $u)"""
                          [ "$id",  box n.Id
                            "$src", box n.Source
                            "$ts",  box (toTs n.At)
                            "$t",   box n.Title
-                           "$u",   box n.Url
-                           "$vp",  box n.VotesPositive
-                           "$vn",  box n.VotesNegative
-                           "$vi",  box n.VotesImportant ]
+                           "$u",   box n.Url ]
                 rows > 0
 
             LastTradeAt = fun asset ->
