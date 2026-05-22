@@ -44,25 +44,81 @@ let private printConfig (cfg : AppSettings) =
     printfn ""
 
 let private runReport (cfg : AppSettings) =
+    task {
+        let db = Persistence.create cfg.DatabasePath
+        db.Init cfg.StartingCashUsd
+        let portfolio = db.GetPortfolio ()
+
+        let! priceMap =
+            task {
+                try
+                    use http = newHttpClient ()
+                    let prices = Prices.create http
+                    let! snaps = prices.Fetch (cfg.Assets |> List.map Asset)
+                    return snaps |> List.map (fun s -> s.Asset, s.PriceUsd) |> Map.ofList
+                with _ ->
+                    return Map.empty
+            }
+
+        let cash = Usd.value portfolio.CashUsd
+        printfn "Portfolio (from %s):" cfg.DatabasePath
+        printfn "  Cash:      $%.4f" cash
+        printfn "  Positions: %d"    portfolio.Positions.Count
+
+        let mutable positionsValue = 0m
+        for KeyValue(asset, p) in portfolio.Positions do
+            let qty       = Qty.value p.Qty
+            let avgCost   = Usd.value p.AvgCostUsd
+            let costBasis = qty * avgCost
+            match Map.tryFind asset priceMap with
+            | Some price ->
+                let mkt = qty * Usd.value price
+                positionsValue <- positionsValue + mkt
+                let pnl    = mkt - costBasis
+                let pnlPct = if costBasis = 0m then 0m else pnl / costBasis * 100m
+                printfn "    %-4s qty=%.8f  avg=$%.2f  now=$%.2f  value=$%.2f  P&L=$%+.2f (%+.2f%%)"
+                    (Asset.value asset) qty avgCost (Usd.value price) mkt pnl pnlPct
+            | None ->
+                positionsValue <- positionsValue + costBasis
+                printfn "    %-4s qty=%.8f  avg=$%.2f  (no live price — valued at cost $%.2f)"
+                    (Asset.value asset) qty avgCost costBasis
+
+        let totalValue  = cash + positionsValue
+        let totalPnl    = totalValue - cfg.StartingCashUsd
+        let totalPnlPct = totalPnl / cfg.StartingCashUsd * 100m
+        printfn "  ----"
+        printfn "  Total value: $%.2f  (cash $%.2f + positions $%.2f)" totalValue cash positionsValue
+        printfn "  Since start: $%+.2f (%+.2f%%) on $%.2f" totalPnl totalPnlPct cfg.StartingCashUsd
+        printfn "  As of:     %s" (portfolio.AsOf.ToString("u"))
+
+        let recent = db.RecentTrades (24.0 * 7.0)
+        printfn "  Trades (last 7d): %d" (List.length recent)
+        for t in recent |> List.truncate 10 do
+            printfn "    %s %-4s qty=%.8f @ $%.4f (fee $%.4f)"
+                (t.At.ToString("u"))
+                (TradeAction.toString t.Side)
+                (Qty.value t.Qty)
+                (Usd.value t.PriceUsd)
+                (Usd.value t.FeeUsd)
+    }
+
+let private runDecisions (cfg : AppSettings) (n : int) =
     let db = Persistence.create cfg.DatabasePath
     db.Init cfg.StartingCashUsd
-    let portfolio = db.GetPortfolio ()
-    printfn "Portfolio (from %s):" cfg.DatabasePath
-    printfn "  Cash:      $%s"     (Usd.value portfolio.CashUsd |> string)
-    printfn "  Positions: %d"      portfolio.Positions.Count
-    for KeyValue(asset, p) in portfolio.Positions do
-        printfn "    %-4s qty=%.8f  avgCost=$%.4f"
-            (Asset.value asset) (Qty.value p.Qty) (Usd.value p.AvgCostUsd)
-    printfn "  As of:     %s"      (portfolio.AsOf.ToString("u"))
-    let recent = db.RecentTrades (24.0 * 7.0)
-    printfn "  Trades (last 7d): %d" (List.length recent)
-    for t in recent |> List.truncate 10 do
-        printfn "    %s %-4s qty=%.8f @ $%.4f (fee $%.4f)"
-            (t.At.ToString("u"))
-            (TradeAction.toString t.Side)
-            (Qty.value t.Qty)
-            (Usd.value t.PriceUsd)
-            (Usd.value t.FeeUsd)
+    let cycles = db.RecentDecisionCycles n
+    if List.isEmpty cycles then
+        printfn "No decision cycles recorded yet."
+    else
+        printfn "Last %d decision cycle(s), newest first:" (List.length cycles)
+        let indented = System.Text.Json.JsonSerializerOptions(WriteIndented = true)
+        for (ts, raw) in cycles do
+            printfn ""
+            printfn "=== %s ===" (ts.ToString("u"))
+            try
+                use doc = System.Text.Json.JsonDocument.Parse(raw)
+                printfn "%s" (System.Text.Json.JsonSerializer.Serialize(doc.RootElement, indented))
+            with _ ->
+                printfn "%s" raw
 
 let private runProbe (cfg : AppSettings) =
     task {
@@ -179,7 +235,14 @@ let main argv =
             (runOnce logger cfg).GetAwaiter().GetResult()
             0
         | [| "--report" |] ->
-            runReport cfg
+            (runReport cfg).GetAwaiter().GetResult()
+            0
+        | [| "--decisions" |] ->
+            runDecisions cfg 3
+            0
+        | [| "--decisions"; nStr |] ->
+            let n = match Int32.TryParse nStr with | true, v -> v | _ -> 3
+            runDecisions cfg n
             0
         | [||] ->
             let logger = makeLogger ()
@@ -192,11 +255,12 @@ let main argv =
             (runLoop logger cfg cts.Token).GetAwaiter().GetResult()
             0
         | _ ->
-            eprintfn "Usage: TradingBot [--probe | --once | --report]"
-            eprintfn "  (no args)   run the cycle loop at the configured cadence"
-            eprintfn "  --probe     smoke-test CoinGecko, CryptoPanic, and Gemini"
-            eprintfn "  --once      run a single cycle and exit"
-            eprintfn "  --report    print current portfolio and recent trades"
+            eprintfn "Usage: TradingBot [--probe | --once | --report | --decisions [n]]"
+            eprintfn "  (no args)       run the cycle loop at the configured cadence"
+            eprintfn "  --probe         smoke-test CoinGecko, RSS feeds, and Gemini"
+            eprintfn "  --once          run a single cycle and exit"
+            eprintfn "  --report        portfolio with live mark-to-market P&L + recent trades"
+            eprintfn "  --decisions [n] print the last n LLM decision cycles (default 3)"
             1
     with ex ->
         eprintfn "Failed: %s" ex.Message
