@@ -33,7 +33,7 @@ module Qty =
     let sub (Qty a) (Qty b) = Qty (a - b)
 
 module TradeAction =
-    let parse (s : string) =
+    let tryParse (s : string) =
         match s.Trim() with
         | "Buy"  -> Some Buy
         | "Sell" -> Some Sell

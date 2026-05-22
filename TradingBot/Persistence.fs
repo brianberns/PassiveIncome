@@ -216,7 +216,7 @@ module Persistence =
                     [ "$cut", box (toTs cutoff) ]
                     (fun r ->
                         let side =
-                            match TradeAction.parse (r.GetString(2)) with
+                            match TradeAction.tryParse (r.GetString(2)) with
                             | Some a -> a
                             | None   -> Hold
                         let oid =

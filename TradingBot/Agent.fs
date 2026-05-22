@@ -95,7 +95,7 @@ module Agent =
         sb.ToString()
 
     let private toDecision (dto : AgentDecisionDto) : Result<Decision, string> =
-        match TradeAction.parse dto.Action with
+        match TradeAction.tryParse dto.Action with
         | None ->
             Error (sprintf "Unknown action '%s' for asset %s" dto.Action dto.Asset)
         | Some action ->
