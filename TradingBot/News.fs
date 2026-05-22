@@ -1,8 +1,10 @@
 namespace TradingBot
 
 open System
+open System.Net
 open System.Net.Http
 open System.ServiceModel.Syndication
+open System.Text.RegularExpressions
 open System.Threading.Tasks
 open System.Xml
 
@@ -23,6 +25,20 @@ module News =
 
     let private maxHeadlinesPerCycle  = 30
     let private freshnessWindowHours  = 24.0
+    let private maxSummaryChars       = 400
+
+    /// RSS <description> fields often contain HTML and boilerplate. Strip tags,
+    /// decode entities, collapse whitespace, and bound the length so we feed the
+    /// LLM clean prose without blowing up token usage.
+    let private cleanSummary (raw : string) : string =
+        if String.IsNullOrWhiteSpace raw then ""
+        else
+            let noTags    = Regex.Replace(raw, "<[^>]+>", " ")
+            let decoded   = WebUtility.HtmlDecode noTags
+            let collapsed = Regex.Replace(decoded, @"\s+", " ").Trim()
+            if collapsed.Length > maxSummaryChars then
+                collapsed.Substring(0, maxSummaryChars).TrimEnd() + "…"
+            else collapsed
 
     let private fetchFeed (httpClient : HttpClient) (sourceName : string) (url : string) =
         task {
@@ -45,11 +61,14 @@ module News =
                               |> Option.defaultValue ""
                           let id =
                               if String.IsNullOrEmpty item.Id then link else item.Id
-                          { Id     = id
-                            Source = sourceName
-                            Title  = title
-                            Url    = link
-                            At     = item.PublishDate } ]
+                          let summary =
+                              if isNull item.Summary then "" else cleanSummary item.Summary.Text
+                          { Id      = id
+                            Source  = sourceName
+                            Title   = title
+                            Summary = summary
+                            Url     = link
+                            At      = item.PublishDate } ]
                 return items
             with _ ->
                 // Per-feed failures are tolerated — one broken feed should not

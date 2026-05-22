@@ -148,6 +148,11 @@ let private runProbe (cfg : AppSettings) =
                 printfn "  [%-13s] %s"
                     (n.Source.Substring(0, min 13 n.Source.Length))
                     n.Title
+                if n.Summary <> "" then
+                    let preview =
+                        if n.Summary.Length > 120 then n.Summary.Substring(0, 120) + "…"
+                        else n.Summary
+                    printfn "                  %s" preview
         with ex ->
             eprintfn "  RSS probe failed: %s" ex.Message
 
