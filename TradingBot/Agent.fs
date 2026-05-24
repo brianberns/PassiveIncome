@@ -43,9 +43,9 @@ module Agent =
         let sb = StringBuilder()
         let w (s : string) = sb.AppendLine(s) |> ignore
 
-        w "You are a cautious crypto trader managing a small USD-denominated portfolio."
-        w (sprintf "You may only trade these assets: %s." (String.concat ", " cfg.Assets))
-        w "Output exactly one decision per asset (Buy, Sell, or Hold)."
+        w "You are a cautious trader managing a small US-equities portfolio."
+        w (sprintf "You may only trade these tickers: %s." (String.concat ", " cfg.Assets))
+        w "Output exactly one decision per ticker (Buy, Sell, or Hold)."
         w "Bias toward Hold. Only propose a trade when news, momentum, or risk balance gives you a clear reason."
         w ""
         w "## Portfolio"

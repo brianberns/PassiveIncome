@@ -90,7 +90,7 @@ module Orchestrator =
                             Errors    = "No prices available — skipping cycle" :: List.ofSeq errors
                         }
                     else
-                        let portfolio    = db.GetPortfolio ()
+                        let! portfolio   = broker.GetPortfolio ()
                         let recentTrades = db.RecentTrades 24.0
 
                         let! agentResult = agent.Propose portfolio priceSnapshots newsItems recentTrades
@@ -152,23 +152,28 @@ module Orchestrator =
 
     let runLoop
         (logger : ILogger)
+        (isMarketOpen : unit -> Task<bool>)
         (orch : Orchestrator)
         (cycleInterval : TimeSpan)
         (cancel : CancellationToken)
         : Task =
         task {
             while not cancel.IsCancellationRequested do
-                logger.LogInformation(sprintf "Starting cycle at %s" (DateTimeOffset.UtcNow.ToString("u")))
                 try
-                    let! summary = orch.RunCycle ()
-                    logger.LogInformation(
-                        sprintf "Cycle done: %d decisions, %d orders, %d fills, %d errors"
-                            (List.length summary.Decisions)
-                            (List.length summary.Orders)
-                            (List.length summary.Fills)
-                            (List.length summary.Errors))
-                    for e in summary.Errors do
-                        logger.LogWarning(sprintf "Cycle error: %s" e)
+                    let! marketOpen = isMarketOpen ()
+                    if not marketOpen then
+                        logger.LogInformation("Market closed — skipping cycle")
+                    else
+                        logger.LogInformation(sprintf "Starting cycle at %s" (DateTimeOffset.UtcNow.ToString("u")))
+                        let! summary = orch.RunCycle ()
+                        logger.LogInformation(
+                            sprintf "Cycle done: %d decisions, %d orders, %d fills, %d errors"
+                                (List.length summary.Decisions)
+                                (List.length summary.Orders)
+                                (List.length summary.Fills)
+                                (List.length summary.Errors))
+                        for e in summary.Errors do
+                            logger.LogWarning(sprintf "Cycle error: %s" e)
                 with ex ->
                     logger.LogError(ex, sprintf "Cycle threw: %s" ex.Message)
 

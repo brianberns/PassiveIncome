@@ -1,10 +1,9 @@
 namespace TradingBot
 
 open System
-open System.Net.Http
-open System.Text.Json
-open System.Text.Json.Serialization
+open System.Collections.Generic
 open System.Threading.Tasks
+open Alpaca.Markets
 
 type Prices = {
     Fetch : Asset list -> Task<PriceSnapshot list>
@@ -12,59 +11,40 @@ type Prices = {
 
 module Prices =
 
-    /// Symbol → CoinGecko coin id. Top-5 hardcoded; extend if AppSettings.Assets grows.
-    let private symbolToCoinGeckoId =
-        Map.ofList [
-            "BTC", "bitcoin"
-            "ETH", "ethereum"
-            "SOL", "solana"
-            "XRP", "ripple"
-            "BNB", "binancecoin"
-        ]
-
-    [<CLIMutable>]
-    type private MarketRow = {
-        [<JsonPropertyName("id")>]                                      Id           : string
-        [<JsonPropertyName("symbol")>]                                  Symbol       : string
-        [<JsonPropertyName("current_price")>]                           CurrentPrice : decimal
-        [<JsonPropertyName("price_change_percentage_24h_in_currency")>] Pct24h       : System.Nullable<float>
-        [<JsonPropertyName("price_change_percentage_7d_in_currency")>]  Pct7d        : System.Nullable<float>
-    }
-
-    let private idToSymbol = symbolToCoinGeckoId |> Map.toSeq |> Seq.map (fun (s, i) -> i, s) |> Map.ofSeq
-
-    let create (httpClient : HttpClient) : Prices =
+    /// Reads daily bars from Alpaca's market-data API. The current price is the
+    /// most recent daily bar's close (today's in-progress bar during RTH);
+    /// Change24hPct is vs. the prior session close, Change7dPct vs. ~5 sessions
+    /// back. For equities these are session-relative, not literal 24h/7d.
+    let create (dataClient : IAlpacaDataClient) : Prices =
         {
             Fetch = fun assets ->
                 task {
-                    let ids =
-                        assets
-                        |> List.map (fun (Asset s) ->
-                            match Map.tryFind s symbolToCoinGeckoId with
-                            | Some id -> id
-                            | None    -> failwithf "No CoinGecko ID mapping for asset %s" s)
-                        |> String.concat ","
-                    let url =
-                        sprintf "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=%s&order=market_cap_desc&per_page=%d&page=1&sparkline=false&price_change_percentage=24h,7d"
-                                ids (List.length assets)
-                    use! response = httpClient.GetAsync(url)
-                    response.EnsureSuccessStatusCode() |> ignore
-                    let! content = response.Content.ReadAsStringAsync()
-                    let rows =
-                        JsonSerializer.Deserialize<MarketRow array>(content, Json.options)
-                    let now = DateTimeOffset.UtcNow
-                    return
-                        rows
-                        |> Array.map (fun r ->
-                            let symbol =
-                                match Map.tryFind r.Id idToSymbol with
-                                | Some s -> s
-                                | None   -> r.Symbol.ToUpperInvariant()
-                            { Asset        = Asset symbol
-                              PriceUsd     = Usd r.CurrentPrice
-                              Change24hPct = if r.Pct24h.HasValue then r.Pct24h.Value else 0.0
-                              Change7dPct  = if r.Pct7d.HasValue  then r.Pct7d.Value  else 0.0
-                              At           = now })
-                        |> Array.toList
+                    let now    = DateTime.UtcNow
+                    let lookback = now.AddDays(-12.0)   // ~8 trading sessions of headroom
+                    let results = List<PriceSnapshot>()
+                    for asset in assets do
+                        let symbol = Asset.value asset
+                        try
+                            let req = HistoricalBarsRequest(symbol, lookback, now, BarTimeFrame.Day)
+                            req.Feed <- Nullable MarketDataFeed.Iex
+                            let! page = dataClient.ListHistoricalBarsAsync(req)
+                            let bars = page.Items |> Seq.toArray
+                            if bars.Length > 0 then
+                                let price      = bars.[bars.Length - 1].Close
+                                let priorClose =
+                                    if bars.Length >= 2 then bars.[bars.Length - 2].Close else price
+                                let close5     =
+                                    if bars.Length >= 6 then bars.[bars.Length - 6].Close else priorClose
+                                let pct (cur : decimal) (prev : decimal) =
+                                    if prev = 0m then 0.0 else float ((cur - prev) / prev) * 100.0
+                                results.Add
+                                    { Asset        = asset
+                                      PriceUsd     = Usd price
+                                      Change24hPct = pct price priorClose
+                                      Change7dPct  = pct price close5
+                                      At           = DateTimeOffset.UtcNow }
+                        with _ ->
+                            ()   // skip a symbol we can't price this cycle
+                    return List.ofSeq results
                 }
         }

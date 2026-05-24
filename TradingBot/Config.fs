@@ -21,6 +21,12 @@ type LlmSettings = {
     ApiKey   : string         // secret, never in appsettings.json
 }
 
+type AlpacaSettings = {
+    KeyId  : string           // secret
+    Secret : string           // secret
+    Paper  : bool             // true = paper-api, false = live-api
+}
+
 type AppSettings = {
     StartingCashUsd    : decimal
     CycleIntervalHours : float
@@ -28,6 +34,7 @@ type AppSettings = {
     Broker             : string
     DatabasePath       : string
     Llm                : LlmSettings
+    Alpaca             : AlpacaSettings
     Risk               : RiskSettings
 }
 
@@ -46,6 +53,10 @@ module Config =
     let private requireDecimal cfg key = require cfg key |> decimal
     let private requireFloat   cfg key = require cfg key |> float
     let private requireInt     cfg key = require cfg key |> int
+    let private optionalBool (cfg : IConfiguration) key (defaultValue : bool) =
+        match cfg.[key] with
+        | null | "" -> defaultValue
+        | v -> (let ok, b = Boolean.TryParse v in if ok then b else defaultValue)
 
     let private readAssets (cfg : IConfiguration) =
         let section = cfg.GetSection("Assets")
@@ -80,6 +91,11 @@ module Config =
                 Model    = require  cfg "Llm:Model"
                 Endpoint = require  cfg "Llm:Endpoint"
                 ApiKey   = optional cfg "Llm:ApiKey" ""
+            }
+            Alpaca = {
+                KeyId  = optional    cfg "Alpaca:KeyId" ""
+                Secret = optional    cfg "Alpaca:Secret" ""
+                Paper  = optionalBool cfg "Alpaca:Paper" true
             }
             Risk = {
                 MinTradeUsd           = requireDecimal cfg "Risk:MinTradeUsd"

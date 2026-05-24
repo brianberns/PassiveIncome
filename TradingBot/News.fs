@@ -14,18 +14,9 @@ type News = {
 
 module News =
 
-    /// RSS feeds we pull each cycle. Hardcoded for v1 — move to config later
-    /// if we want per-environment feed lists.
-    let private defaultFeeds : (string * string) list = [
-        "CoinDesk",      "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml"
-        "CoinTelegraph", "https://cointelegraph.com/rss"
-        "Decrypt",       "https://decrypt.co/feed"
-        "TheBlock",      "https://www.theblock.co/rss.xml"
-    ]
-
-    let private maxHeadlinesPerCycle  = 30
-    let private freshnessWindowHours  = 24.0
-    let private maxSummaryChars       = 400
+    let private maxHeadlinesPerCycle = 30
+    let private freshnessWindowHours = 36.0   // equities: span weekends/overnight gaps
+    let private maxSummaryChars      = 400
 
     /// RSS <description> fields often contain HTML and boilerplate. Strip tags,
     /// decode entities, collapse whitespace, and bound the length so we feed the
@@ -40,6 +31,13 @@ module News =
                 collapsed.Substring(0, maxSummaryChars).TrimEnd() + "…"
             else collapsed
 
+    /// Feeds for this cycle: one ticker-scoped Yahoo Finance feed built from the
+    /// asset list, plus a general market feed for macro context.
+    let private feedsFor (assets : Asset list) : (string * string) list =
+        let tickers = assets |> List.map Asset.value |> String.concat ","
+        [ "Yahoo",       sprintf "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US" tickers
+          "MarketWatch", "http://feeds.marketwatch.com/marketwatch/topstories/" ]
+
     let private fetchFeed (httpClient : HttpClient) (sourceName : string) (url : string) =
         task {
             try
@@ -51,16 +49,13 @@ module News =
                 let feed = SyndicationFeed.Load(xmlReader)
                 let items =
                     [ for item in feed.Items ->
-                          let title =
-                              if isNull item.Title then "" else item.Title.Text
+                          let title = if isNull item.Title then "" else item.Title.Text
                           let link =
                               item.Links
                               |> Seq.tryHead
-                              |> Option.map (fun l ->
-                                  if isNull l.Uri then "" else l.Uri.ToString())
+                              |> Option.map (fun l -> if isNull l.Uri then "" else l.Uri.ToString())
                               |> Option.defaultValue ""
-                          let id =
-                              if String.IsNullOrEmpty item.Id then link else item.Id
+                          let id = if String.IsNullOrEmpty item.Id then link else item.Id
                           let summary =
                               if isNull item.Summary then "" else cleanSummary item.Summary.Text
                           { Id      = id
@@ -71,19 +66,16 @@ module News =
                             At      = item.PublishDate } ]
                 return items
             with _ ->
-                // Per-feed failures are tolerated — one broken feed should not
-                // wipe the cycle. The orchestrator will still log "no fresh news"
-                // if every feed fails.
-                return []
+                return []   // tolerate a broken/unavailable feed
         }
 
     let create (httpClient : HttpClient) : News =
         {
-            Fetch = fun _assets ->
+            Fetch = fun assets ->
                 task {
                     let cutoff = DateTimeOffset.UtcNow.AddHours(-freshnessWindowHours)
                     let! results =
-                        defaultFeeds
+                        feedsFor assets
                         |> List.map (fun (name, url) -> fetchFeed httpClient name url)
                         |> Task.WhenAll
                     return
