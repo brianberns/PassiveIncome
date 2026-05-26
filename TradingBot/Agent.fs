@@ -108,36 +108,50 @@ module Agent =
                 Rationale  = dto.Rationale
             }
 
+    /// Gemini occasionally returns truncated JSON, which fails structured-output
+    /// parsing and (with a single batched call) loses the whole cycle. Retry a
+    /// few times — a transient truncation almost always succeeds on a retry.
+    let private maxAttempts = 3
+
     let create (chatClient : IChatClient) (cfg : AppSettings) : Agent =
         {
             Propose = fun portfolio prices news recentTrades ->
-                task {
-                    let prompt = buildPrompt cfg portfolio prices news recentTrades
-                    let options = ChatOptions()
-                    options.Temperature     <- Nullable 0.2f
-                    options.MaxOutputTokens <- Nullable 4000
-                    let mutable rawText = ""
-                    try
-                        let! response =
-                            ChatClientStructuredOutputExtensions.GetResponseAsync<AgentResponseDto>(
-                                chatClient, prompt, options)
-                        rawText <-
-                            response.Text
-                            |> Option.ofObj
-                            |> Option.defaultValue ""
-                        let dto = response.Result
-                        let decisions =
-                            dto.Decisions
-                            |> Array.choose (fun d ->
-                                match toDecision d with
-                                | Ok dec  -> Some dec
-                                | Error _ -> None)
-                            |> Array.toList
-                        return Ok (decisions, rawText)
-                    with ex ->
-                        return Error (sprintf "Agent.Propose failed: %s\nRaw response (%d bytes):\n%s"
-                                              ex.Message
-                                              rawText.Length
-                                              rawText)
-                }
+                let prompt = buildPrompt cfg portfolio prices news recentTrades
+                let options = ChatOptions()
+                options.Temperature     <- Nullable 0.2f
+                options.MaxOutputTokens <- Nullable 4000
+
+                let attempt () =
+                    task {
+                        let mutable rawText = ""
+                        try
+                            let! response =
+                                ChatClientStructuredOutputExtensions.GetResponseAsync<AgentResponseDto>(
+                                    chatClient, prompt, options)
+                            rawText <- response.Text |> Option.ofObj |> Option.defaultValue ""
+                            let dto = response.Result
+                            let decisions =
+                                dto.Decisions
+                                |> Array.choose (fun d ->
+                                    match toDecision d with
+                                    | Ok dec  -> Some dec
+                                    | Error _ -> None)
+                                |> Array.toList
+                            return Ok (decisions, rawText)
+                        with ex ->
+                            let preview =
+                                if rawText.Length > 300 then rawText.Substring(0, 300) + "…" else rawText
+                            return Error (sprintf "%s | raw (%d bytes): %s" ex.Message rawText.Length preview)
+                    }
+
+                let rec loop n =
+                    task {
+                        let! r = attempt ()
+                        match r with
+                        | Ok _ -> return r
+                        | Error e when n >= maxAttempts ->
+                            return Error (sprintf "Agent.Propose failed after %d attempts: %s" n e)
+                        | Error _ -> return! loop (n + 1)
+                    }
+                loop 1
         }
