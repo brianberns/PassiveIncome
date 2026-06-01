@@ -1,6 +1,7 @@
 namespace TradingBot
 
 open System
+open System.ClientModel
 open System.Text
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
@@ -113,6 +114,28 @@ module Agent =
     /// few times — a transient truncation almost always succeeds on a retry.
     let private maxAttempts = 3
 
+    /// Walk the inner-exception chain. For any ClientResultException, also
+    /// include the HTTP response body — Google's 429 etc. carry the actual
+    /// quota name (e.g. "quotaId": "...") in there, which the generic message
+    /// strips out.
+    let private describeException (ex : exn) : string =
+        let sb = StringBuilder()
+        let rec walk (e : exn) =
+            sb.Append(e.GetType().Name).Append(": ").Append(e.Message) |> ignore
+            match e with
+            | :? ClientResultException as cre ->
+                try
+                    let body = cre.GetRawResponse().Content.ToString()
+                    if not (String.IsNullOrEmpty body) then
+                        sb.Append(" | body: ").Append(body) |> ignore
+                with _ -> ()
+            | _ -> ()
+            if not (isNull e.InnerException) then
+                sb.Append(" >> ") |> ignore
+                walk e.InnerException
+        walk ex
+        sb.ToString()
+
     let create (chatClient : IChatClient) (cfg : AppSettings) : Agent =
         {
             Propose = fun portfolio prices news recentTrades ->
@@ -141,7 +164,8 @@ module Agent =
                         with ex ->
                             let preview =
                                 if rawText.Length > 300 then rawText.Substring(0, 300) + "…" else rawText
-                            return Error (sprintf "%s | raw (%d bytes): %s" ex.Message rawText.Length preview)
+                            return Error (sprintf "%s | raw (%d bytes): %s"
+                                                  (describeException ex) rawText.Length preview)
                     }
 
                 let rec loop n =
@@ -149,12 +173,13 @@ module Agent =
                         let! r = attempt ()
                         match r with
                         | Ok _ -> return r
+                        | Error e when e.Contains "Status: 429" ->
+                            // Don't retry on rate limits — pounding the API just burns
+                            // more quota. The next hourly cycle will try again.
+                            return Error (sprintf "Agent.Propose: rate limited (no retry): %s" e)
                         | Error e when n >= maxAttempts ->
                             return Error (sprintf "Agent.Propose failed after %d attempts: %s" n e)
                         | Error _ ->
-                            // Exponential backoff: 1s, 2s, 4s. Without this, immediate
-                            // retries pile up in the same per-minute rate-limit window
-                            // (we saw a 429 cascade through all 3 attempts in seconds).
                             do! Task.Delay (1000 * pown 2 (n - 1))
                             return! loop (n + 1)
                     }
