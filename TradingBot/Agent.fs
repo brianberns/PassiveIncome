@@ -151,7 +151,12 @@ module Agent =
                         | Ok _ -> return r
                         | Error e when n >= maxAttempts ->
                             return Error (sprintf "Agent.Propose failed after %d attempts: %s" n e)
-                        | Error _ -> return! loop (n + 1)
+                        | Error _ ->
+                            // Exponential backoff: 1s, 2s, 4s. Without this, immediate
+                            // retries pile up in the same per-minute rate-limit window
+                            // (we saw a 429 cascade through all 3 attempts in seconds).
+                            do! Task.Delay (1000 * pown 2 (n - 1))
+                            return! loop (n + 1)
                     }
                 loop 1
         }
