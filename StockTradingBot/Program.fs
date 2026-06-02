@@ -6,7 +6,10 @@ open System.Xml
 
 let feedUrls =
     [
-        "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+        "https://feeds.content.dowjones.io/public/rss/mw_topstories"                             // "MarketWatch.com - Top Stories"
+        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"   // CNBC: "US Top News and Analysis"
+        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"    // CNBC: "Finance"
+        "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"        // "Yahoo! Finance: ^GSPC News" (S&P 500)
     ]
 
 let getItems (httpClient : HttpClient) (feedUrl : string) =
@@ -21,13 +24,17 @@ let getItems (httpClient : HttpClient) (feedUrl : string) =
     } |> Async.AwaitTask
 
 do
-    use httpClient = new HttpClient()
+    use httpClient =
+        let client = new HttpClient()
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
+        client
     let items =
         feedUrls
             |> Seq.map (getItems httpClient)
             |> Async.Parallel
             |> Async.RunSynchronously
             |> Seq.concat
+            |> Seq.distinctBy _.Id
             |> Seq.sortByDescending _.PublishDate
     for item in items do
         printfn ""
