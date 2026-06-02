@@ -42,10 +42,13 @@ module News =
           "CNBC",        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114" ]
 
     /// Per-ticker Yahoo Finance headline feed for stage-2 evaluation.
+    /// Yahoo uses a hyphen for share-class tickers (BRK-B) where Alpaca/our
+    /// domain use a dot (BRK.B); without this mapping such symbols return no news.
     let private tickerFeed (asset : Asset) : string * string =
+        let yahooSym = (Asset.value asset).Replace('.', '-')
         "Yahoo",
         sprintf "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US"
-                (Asset.value asset)
+                yahooSym
 
     let private fetchFeed (httpClient : HttpClient) (sourceName : string) (url : string) =
         task {
