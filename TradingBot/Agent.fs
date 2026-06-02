@@ -189,20 +189,24 @@ module Agent =
         w "Output JSON: { action, sizeUsd, confidence, manipulationRisk, rationale }."
         sb.ToString()
 
-    let private toDecision (asset : Asset) (dto : AgentDecisionDto) : Result<Decision, string> =
-        match TradeAction.tryParse dto.Action with
-        | None -> Error (sprintf "Unknown action '%s' for %s" dto.Action (Asset.value asset))
-        | Some action ->
-            // Unparseable manipulation risk defaults to High (most cautious).
-            let mr = ManipulationRisk.tryParse dto.ManipulationRisk |> Option.defaultValue High
-            Ok {
-                Asset            = asset
-                Action           = action
-                SizeUsd          = Usd dto.SizeUsd
-                Confidence       = dto.Confidence
-                ManipulationRisk = mr
-                Rationale        = (if isNull dto.Rationale then "" else dto.Rationale)
-            }
+    let private toDecision (asset : Asset) (dto : AgentDecisionDto) : Decision =
+        let baseRationale = if isNull dto.Rationale then "" else dto.Rationale
+        // A missing/garbled action defaults to Hold — we never trade on a
+        // malformed response. Flagged in the rationale so it stays visible.
+        let action, rationale =
+            match TradeAction.tryParse dto.Action with
+            | Some a -> a, baseRationale
+            | None   -> Hold, "[no valid action returned] " + baseRationale
+        // Unparseable manipulation risk defaults to High (most cautious).
+        let mr = ManipulationRisk.tryParse dto.ManipulationRisk |> Option.defaultValue High
+        {
+            Asset            = asset
+            Action           = action
+            SizeUsd          = Usd dto.SizeUsd
+            Confidence       = dto.Confidence
+            ManipulationRisk = mr
+            Rationale        = rationale
+        }
 
     let create (chatClient : IChatClient) (cfg : AppSettings) : Agent =
         {
@@ -223,9 +227,6 @@ module Agent =
                     let! r = callStructured<AgentDecisionDto> chatClient prompt
                     match r with
                     | Error e -> return Error (sprintf "EvaluateAsset(%s) %s" (Asset.value price.Asset) e)
-                    | Ok (dto, raw) ->
-                        match toDecision price.Asset dto with
-                        | Error e -> return Error e
-                        | Ok d    -> return Ok (d, raw)
+                    | Ok (dto, raw) -> return Ok (toDecision price.Asset dto, raw)
                 }
         }
