@@ -130,6 +130,28 @@ let private runDecisions (cfg : AppSettings) (n : int) =
                 printfn "%s" (System.Text.Json.JsonSerializer.Serialize(doc.RootElement, indented))
             with _ -> printfn "%s" raw
 
+let private runAssetLookup (cfg : AppSettings) (symbol : string) =
+    task {
+        let trading, _ = makeAlpacaClients cfg
+        let sym = symbol.Trim().ToUpperInvariant()
+        printfn "Looking up asset %s via Alpaca trading API..." sym
+        try
+            let! a = trading.GetAssetAsync(sym)
+            printfn "  Symbol:        %s" a.Symbol
+            printfn "  Name:          %s" a.Name
+            printfn "  Class:         %A" a.Class
+            printfn "  Exchange:      %A" a.Exchange
+            printfn "  Status:        %A" a.Status
+            printfn "  Tradable:      %b" a.IsTradable
+            printfn "  Fractionable:  %b" a.Fractionable
+            printfn "  Marginable:    %b" a.Marginable
+            printfn "  Shortable:     %b" a.Shortable
+        with ex ->
+            eprintfn "  Lookup FAILED: %s: %s" (ex.GetType().Name) ex.Message
+            if not (isNull ex.InnerException) then
+                eprintfn "    inner: %s" ex.InnerException.Message
+    }
+
 let private runProbe (cfg : AppSettings) =
     task {
         use http = newHttpClient ()
@@ -258,6 +280,9 @@ let main argv =
         | [| "--report" |] ->
             (runReport cfg).GetAwaiter().GetResult()
             0
+        | [| "--asset"; sym |] ->
+            (runAssetLookup cfg sym).GetAwaiter().GetResult()
+            0
         | [| "--decisions" |] ->
             runDecisions cfg 3
             0
@@ -281,6 +306,7 @@ let main argv =
             eprintfn "  --probe         smoke-test Alpaca + the two-stage discovery pipeline"
             eprintfn "  --once          run a single cycle and exit"
             eprintfn "  --report        portfolio with live mark-to-market P&L + recent trades"
+            eprintfn "  --asset SYM     look up one ticker's Alpaca tradability metadata"
             eprintfn "  --decisions [n] print the last n LLM decision cycles (default 3)"
             1
     with ex ->
