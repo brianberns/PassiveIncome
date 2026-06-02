@@ -9,7 +9,12 @@ open Alpaca.Markets
 type Broker = {
     GetPortfolio : unit -> Task<Portfolio>
     IsMarketOpen : unit -> Task<bool>
-    PlaceMarket  : Asset -> TradeAction -> Usd -> Task<Result<Fill, string>>
+    /// Tradability metadata for a (possibly news-discovered) ticker. None if the
+    /// broker doesn't recognise the symbol — used to drop hallucinated tickers.
+    GetAssetInfo : Asset -> Task<AssetInfo option>
+    /// Place a notional market order. The decimal option is the asset's ADDV at
+    /// decision time, recorded with the fill for later liquidity auditing.
+    PlaceMarket  : Asset -> TradeAction -> Usd -> decimal option -> Task<Result<Fill, string>>
 }
 
 /// Offline simulator: fills against whatever Prices returns, applying a
@@ -36,7 +41,10 @@ module PaperBroker =
 
             IsMarketOpen = fun () -> Task.FromResult true
 
-            PlaceMarket = fun asset side sizeUsd ->
+            GetAssetInfo = fun _ ->
+                Task.FromResult (Some { Tradable = true; Fractionable = true })
+
+            PlaceMarket = fun asset side sizeUsd addvUsd ->
                 task {
                     match side with
                     | Hold -> return Error "Cannot place a Hold order"
@@ -92,11 +100,12 @@ module PaperBroker =
                             db.RecordTrade {
                                 Asset = asset; Side = side; Qty = Qty qtyValue
                                 PriceUsd = Usd execPrice; FeeUsd = Usd feeUsd
-                                At = now; BrokerOrderId = None
+                                AddvUsd = addvUsd; At = now; BrokerOrderId = None
                             }
                             return Ok {
                                 Asset = asset; Side = side; Qty = Qty qtyValue
-                                Price = Usd execPrice; FeeUsd = Usd feeUsd; At = now
+                                Price = Usd execPrice; FeeUsd = Usd feeUsd
+                                AddvUsd = addvUsd; At = now
                             }
                 }
         }
@@ -147,7 +156,16 @@ module AlpacaBroker =
                     return clock.IsOpen
                 }
 
-            PlaceMarket = fun asset side sizeUsd ->
+            GetAssetInfo = fun asset ->
+                task {
+                    try
+                        let! a = tradingClient.GetAssetAsync(Asset.value asset)
+                        return Some { Tradable = a.IsTradable; Fractionable = a.Fractionable }
+                    with _ ->
+                        return None   // unknown/again hallucinated symbol
+                }
+
+            PlaceMarket = fun asset side sizeUsd addvUsd ->
                 task {
                     match side with
                     | Hold -> return Error "Cannot place a Hold order"
@@ -175,11 +193,13 @@ module AlpacaBroker =
                                 db.RecordTrade {
                                     Asset = asset; Side = side; Qty = Qty qty
                                     PriceUsd = Usd price; FeeUsd = Usd 0m
-                                    At = now; BrokerOrderId = Some (string o.OrderId)
+                                    AddvUsd = addvUsd; At = now
+                                    BrokerOrderId = Some (string o.OrderId)
                                 }
                                 return Ok {
                                     Asset = asset; Side = side; Qty = Qty qty
-                                    Price = Usd price; FeeUsd = Usd 0m; At = now
+                                    Price = Usd price; FeeUsd = Usd 0m
+                                    AddvUsd = addvUsd; At = now
                                 }
                         with ex ->
                             return Error (sprintf "Alpaca order failed for %s: %s" symbol ex.Message)

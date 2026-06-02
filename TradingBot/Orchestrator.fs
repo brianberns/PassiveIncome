@@ -21,15 +21,23 @@ type Orchestrator = {
 
 module Orchestrator =
 
+    let private serializeDiscovery (marketTrend : string) (candidates : Candidate list) : string =
+        JsonSerializer.Serialize(
+            {| marketTrend = marketTrend
+               candidates  = candidates |> List.map (fun c ->
+                                {| ticker = Asset.value c.Ticker; reason = c.Reason |}) |},
+            Json.options)
+
     let private serializeDecisions (decisions : Decision list) : string =
         let dtos =
             decisions
             |> List.map (fun d ->
-                {| asset      = Asset.value d.Asset
-                   action     = TradeAction.toString d.Action
-                   sizeUsd    = Usd.value d.SizeUsd
-                   confidence = d.Confidence
-                   rationale  = d.Rationale |})
+                {| asset            = Asset.value d.Asset
+                   action           = TradeAction.toString d.Action
+                   sizeUsd          = Usd.value d.SizeUsd
+                   confidence       = d.Confidence
+                   manipulationRisk = ManipulationRisk.toString d.ManipulationRisk
+                   rationale        = d.Rationale |})
         JsonSerializer.Serialize(dtos, Json.options)
 
     let private serializeFills (fills : Fill list) : string =
@@ -40,7 +48,7 @@ module Orchestrator =
                    side  = TradeAction.toString f.Side
                    qty   = Qty.value f.Qty
                    price = Usd.value f.Price
-                   fee   = Usd.value f.FeeUsd |})
+                   addv  = f.AddvUsd |})
         JsonSerializer.Serialize(dtos, Json.options)
 
     let create
@@ -57,96 +65,133 @@ module Orchestrator =
                 task {
                     let started = DateTimeOffset.UtcNow
                     let errors  = ResizeArray<string>()
-                    let assets  = cfg.Assets |> List.map Asset
 
-                    let! priceSnapshots =
+                    let! portfolio = broker.GetPortfolio ()
+
+                    // --- Stage 1: discovery from general news ---
+                    let! generalNews =
                         task {
                             try
-                                let! snaps = prices.Fetch assets
-                                for s in snaps do db.RecordPrice s
-                                return snaps
-                            with ex ->
-                                errors.Add(sprintf "Prices: %s" ex.Message)
-                                return []
+                                let! items = news.FetchGeneral ()
+                                items |> List.iter (db.TryRecordNews >> ignore)
+                                return items
+                            with ex -> errors.Add(sprintf "News(general): %s" ex.Message); return []
                         }
 
-                    let! newsItems =
+                    let! marketTrend, candidates =
                         task {
-                            try
-                                let! items = news.Fetch assets
-                                let fresh = items |> List.filter db.TryRecordNews
-                                return fresh
-                            with ex ->
-                                errors.Add(sprintf "News: %s" ex.Message)
-                                return []
+                            let! r = agent.IdentifyCandidates generalNews
+                            match r with
+                            | Ok ((trend, cands), _raw) -> return trend, cands
+                            | Error e ->
+                                // Discovery failure shouldn't strand holdings — continue with
+                                // no trend / no new candidates so we can still evaluate (and
+                                // potentially sell) what we already hold.
+                                errors.Add e
+                                return "", []
                         }
 
-                    if List.isEmpty priceSnapshots then
-                        return {
-                            Started   = started
-                            Decisions = []
-                            Orders    = []
-                            Fills     = []
-                            Errors    = "No prices available — skipping cycle" :: List.ofSeq errors
-                        }
-                    else
-                        let! portfolio   = broker.GetPortfolio ()
-                        let recentTrades = db.RecentTrades 24.0
+                    let cappedCandidates = candidates |> List.truncate cfg.Discovery.MaxCandidatesPerCycle
+                    for c in cappedCandidates do
+                        logger.LogInformation(sprintf "Candidate %s — %s" (Asset.value c.Ticker) c.Reason)
 
-                        let! agentResult = agent.Propose portfolio priceSnapshots newsItems recentTrades
-                        match agentResult with
-                        | Error e ->
-                            errors.Add e
-                            return {
-                                Started = started; Decisions = []; Orders = []; Fills = []
-                                Errors  = List.ofSeq errors
-                            }
-                        | Ok (decisions, rawJson) ->
-                            let outcome =
-                                Risk.validateAndSize
-                                    cfg.Risk portfolio priceSnapshots
-                                    db.LastTradeAt
-                                    DateTimeOffset.UtcNow
-                                    decisions
+                    // --- Build evaluation set: new candidates ∪ current holdings ---
+                    let heldAssets = portfolio.Positions |> Map.toList |> List.map fst
+                    let candidateAssets = cappedCandidates |> List.map (fun c -> c.Ticker)
+                    let evalSet = (candidateAssets @ heldAssets) |> List.distinct
 
-                            for r in outcome.Rejected do
-                                logger.LogInformation(
-                                    sprintf "Rejected %s %s: %s"
-                                        (Asset.value r.Decision.Asset)
-                                        (TradeAction.toString r.Decision.Action)
-                                        r.Reason)
+                    // --- Stage 2: validate, price, liquidity-gate, and decide per asset ---
+                    let decisions    = ResizeArray<Decision>()
+                    let priceSnaps   = ResizeArray<PriceSnapshot>()
+                    let addvByAsset  = Dictionary<Asset, decimal>()
 
-                            let fills = ResizeArray<Fill>()
-                            for order in outcome.Orders do
-                                let! result = broker.PlaceMarket order.Asset order.Side order.SizeUsd
-                                match result with
-                                | Ok fill ->
-                                    fills.Add fill
+                    for asset in evalSet do
+                        let symbol = Asset.value asset
+                        let isHeld = portfolio.Positions.ContainsKey asset
+                        let! info  = broker.GetAssetInfo asset
+                        match info with
+                        | Some i when not (i.Tradable && i.Fractionable) ->
+                            logger.LogInformation(sprintf "Skip %s: not tradable/fractionable" symbol)
+                        | None ->
+                            logger.LogInformation(sprintf "Skip %s: unknown to broker" symbol)
+                        | Some _ ->
+                            let! priced = prices.FetchOne asset
+                            match priced with
+                            | None ->
+                                logger.LogInformation(sprintf "Skip %s: no price" symbol)
+                            | Some (snap, addv) ->
+                                let passesFloor =
+                                    Usd.value snap.PriceUsd >= cfg.Discovery.MinSharePrice
+                                    && addv >= cfg.Discovery.MinAvgDollarVolume
+                                if (not isHeld) && (not passesFloor) then
                                     logger.LogInformation(
-                                        sprintf "Filled %s %s qty=%.8f @ $%.4f (fee $%.4f)"
-                                            (TradeAction.toString fill.Side)
-                                            (Asset.value fill.Asset)
-                                            (Qty.value fill.Qty)
-                                            (Usd.value fill.Price)
-                                            (Usd.value fill.FeeUsd))
-                                | Error e ->
-                                    errors.Add(sprintf "%s %s: %s"
-                                        (TradeAction.toString order.Side)
-                                        (Asset.value order.Asset) e)
+                                        sprintf "Skip %s: below liquidity floor (px $%.2f, ADDV $%.0f)"
+                                            symbol (Usd.value snap.PriceUsd) addv)
+                                else
+                                    db.RecordPrice snap
+                                    priceSnaps.Add snap
+                                    addvByAsset.[asset] <- addv
+                                    let! tickerNews =
+                                        task {
+                                            try
+                                                let! items = news.FetchForTicker asset
+                                                items |> List.iter (db.TryRecordNews >> ignore)
+                                                return items
+                                            with _ -> return []
+                                        }
+                                    let! r = agent.EvaluateAsset marketTrend portfolio snap tickerNews
+                                    match r with
+                                    | Ok (d, _raw) -> decisions.Add d
+                                    | Error e -> errors.Add e
 
-                            let fillsList = List.ofSeq fills
-                            db.RecordDecisionCycle
-                                started rawJson
-                                (serializeDecisions decisions)
-                                (serializeFills fillsList)
+                    let decisionList   = List.ofSeq decisions
+                    let priceSnapList  = List.ofSeq priceSnaps
 
-                            return {
-                                Started   = started
-                                Decisions = decisions
-                                Orders    = outcome.Orders
-                                Fills     = fillsList
-                                Errors    = List.ofSeq errors
-                            }
+                    // --- Risk overlay ---
+                    let outcome =
+                        Risk.validateAndSize
+                            cfg.Risk portfolio priceSnapList
+                            db.LastTradeAt DateTimeOffset.UtcNow decisionList
+
+                    for r in outcome.Rejected do
+                        logger.LogInformation(
+                            sprintf "Rejected %s %s: %s"
+                                (Asset.value r.Decision.Asset)
+                                (TradeAction.toString r.Decision.Action) r.Reason)
+
+                    // --- Execute ---
+                    let fills = ResizeArray<Fill>()
+                    for order in outcome.Orders do
+                        let addv =
+                            match addvByAsset.TryGetValue order.Asset with
+                            | true, v -> Some v
+                            | _ -> None
+                        let! result = broker.PlaceMarket order.Asset order.Side order.SizeUsd addv
+                        match result with
+                        | Ok fill ->
+                            fills.Add fill
+                            logger.LogInformation(
+                                sprintf "Filled %s %s qty=%.6f @ $%.4f"
+                                    (TradeAction.toString fill.Side) (Asset.value fill.Asset)
+                                    (Qty.value fill.Qty) (Usd.value fill.Price))
+                        | Error e ->
+                            errors.Add(sprintf "%s %s: %s"
+                                (TradeAction.toString order.Side) (Asset.value order.Asset) e)
+
+                    let fillsList = List.ofSeq fills
+                    db.RecordDecisionCycle
+                        started
+                        (serializeDiscovery marketTrend cappedCandidates)
+                        (serializeDecisions decisionList)
+                        (serializeFills fillsList)
+
+                    return {
+                        Started   = started
+                        Decisions = decisionList
+                        Orders    = outcome.Orders
+                        Fills     = fillsList
+                        Errors    = List.ofSeq errors
+                    }
                 }
         }
 

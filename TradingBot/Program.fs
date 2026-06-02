@@ -41,10 +41,13 @@ let private makeLogger () : ILogger =
     factory.CreateLogger("TradingBot")
 
 let private printConfig (cfg : AppSettings) =
-    printfn "TradingBot v0.2 (Alpaca)"
+    printfn "TradingBot v0.3 (Alpaca, news-discovery)"
     printfn "  Starting cash:   $%g"      cfg.StartingCashUsd
     printfn "  Cycle interval:  %g hours" cfg.CycleIntervalHours
-    printfn "  Assets:          %s"       (String.concat ", " cfg.Assets)
+    let seed = if List.isEmpty cfg.Assets then "(pure discovery)" else String.concat ", " cfg.Assets
+    printfn "  Seed assets:     %s"       seed
+    printfn "  Discovery:       max %d candidates/cycle, floor px ≥ $%g, ADDV ≥ $%g"
+        cfg.Discovery.MaxCandidatesPerCycle cfg.Discovery.MinSharePrice cfg.Discovery.MinAvgDollarVolume
     printfn "  Broker:          %s (%s)"  cfg.Broker (if cfg.Alpaca.Paper then "paper" else "LIVE")
     printfn "  Database:        %s"       cfg.DatabasePath
     printfn "  LLM model:       %s"       cfg.Llm.Model
@@ -64,10 +67,11 @@ let private runReport (cfg : AppSettings) =
         let broker = makeBroker cfg db trading prices
         let! portfolio = broker.GetPortfolio ()
 
+        let heldAssets = portfolio.Positions |> Map.toList |> List.map fst
         let! priceMap =
             task {
                 try
-                    let! snaps = prices.Fetch (cfg.Assets |> List.map Asset)
+                    let! snaps = prices.Fetch heldAssets
                     return snaps |> List.map (fun s -> s.Asset, s.PriceUsd) |> Map.ofList
                 with _ -> return Map.empty
             }
@@ -129,7 +133,6 @@ let private runDecisions (cfg : AppSettings) (n : int) =
 let private runProbe (cfg : AppSettings) =
     task {
         use http = newHttpClient ()
-        let assets = cfg.Assets |> List.map Asset
 
         printfn "Probing Alpaca account..."
         if String.IsNullOrEmpty cfg.Alpaca.KeyId then
@@ -147,53 +150,56 @@ let private runProbe (cfg : AppSettings) =
                 eprintfn "  Alpaca probe failed: %s" ex.Message
 
         printfn ""
-        printfn "Probing Alpaca market data..."
-        try
-            let _, data = makeAlpacaClients cfg
-            let prices = Prices.create data
-            let! snapshots = prices.Fetch assets
-            for p in snapshots do
-                printfn "  %-5s $%-10s  1d: %+6.2f%%   5d: %+6.2f%%"
-                    (Asset.value p.Asset) (Usd.value p.PriceUsd |> string) p.Change24hPct p.Change7dPct
-        with ex ->
-            eprintfn "  Market-data probe failed: %s" ex.Message
-
-        printfn ""
-        printfn "Probing RSS feeds..."
-        try
-            let news = News.create http
-            let! items = news.Fetch assets
-            printfn "  Received %d headlines:" (List.length items)
-            for n in items |> List.truncate 10 do
-                printfn "  [%-12s] %s" (n.Source.Substring(0, min 12 n.Source.Length)) n.Title
-                if n.Summary <> "" then
-                    let preview = if n.Summary.Length > 120 then n.Summary.Substring(0, 120) + "…" else n.Summary
-                    printfn "                 %s" preview
-        with ex ->
-            eprintfn "  RSS probe failed: %s" ex.Message
-
-        printfn ""
-        printfn "Probing Gemini (LLM)..."
+        printfn "Probing Stage 1: general news → discovery..."
         if String.IsNullOrEmpty cfg.Llm.ApiKey then
             printfn "  (Gemini API key not set — skipping)"
         else
             try
-                let chat = makeChatClient cfg
-                let agent = Agent.create chat cfg
-                let portfolio = { CashUsd = Usd cfg.StartingCashUsd; Positions = Map.empty; AsOf = DateTimeOffset.UtcNow }
+                let news   = News.create http
+                let agent  = Agent.create (makeChatClient cfg) cfg
                 let _, data = makeAlpacaClients cfg
-                let! priceSnapshots = (Prices.create data).Fetch assets
-                let! result = agent.Propose portfolio priceSnapshots [] []
-                match result with
-                | Error e -> eprintfn "  Gemini probe failed: %s" e
-                | Ok (decisions, _raw) ->
-                    printfn "  Received %d decisions:" (List.length decisions)
-                    for d in decisions do
-                        printfn "    %-5s %-4s $%.2f conf=%.2f — %s"
-                            (Asset.value d.Asset) (TradeAction.toString d.Action)
-                            (Usd.value d.SizeUsd) d.Confidence d.Rationale
+                let prices = Prices.create data
+                let! general = news.FetchGeneral ()
+                printfn "  General headlines: %d" (List.length general)
+                let! disc = agent.IdentifyCandidates general
+                match disc with
+                | Error e -> eprintfn "  Discovery failed: %s" e
+                | Ok ((trend, candidates), _raw) ->
+                    printfn "  Market trend: %s" trend
+                    let capped = candidates |> List.truncate cfg.Discovery.MaxCandidatesPerCycle
+                    printfn "  Candidates (%d):" (List.length capped)
+                    // Liquidity gate per candidate
+                    let survivors = System.Collections.Generic.List<PriceSnapshot>()
+                    for c in capped do
+                        let! priced = prices.FetchOne c.Ticker
+                        match priced with
+                        | None ->
+                            printfn "    %-6s  no price (excluded)         — %s" (Asset.value c.Ticker) c.Reason
+                        | Some (snap, addv) ->
+                            let pass =
+                                Usd.value snap.PriceUsd >= cfg.Discovery.MinSharePrice
+                                && addv >= cfg.Discovery.MinAvgDollarVolume
+                            printfn "    %-6s  $%-8.2f ADDV $%-12.0f %s — %s"
+                                (Asset.value c.Ticker) (Usd.value snap.PriceUsd) addv
+                                (if pass then "PASS" else "below floor") c.Reason
+                            if pass then survivors.Add snap
+                    // Stage 2 on the first survivor to confirm the per-asset path
+                    match List.ofSeq survivors with
+                    | snap :: _ ->
+                        printfn ""
+                        printfn "  Stage 2 sample (%s):" (Asset.value snap.Asset)
+                        let portfolio = { CashUsd = Usd cfg.StartingCashUsd; Positions = Map.empty; AsOf = DateTimeOffset.UtcNow }
+                        let! tnews = news.FetchForTicker snap.Asset
+                        let! d = agent.EvaluateAsset trend portfolio snap tnews
+                        match d with
+                        | Error e -> eprintfn "    failed: %s" e
+                        | Ok (dec, _raw) ->
+                            printfn "    %-4s $%.2f conf=%.2f manip=%s — %s"
+                                (TradeAction.toString dec.Action) (Usd.value dec.SizeUsd)
+                                dec.Confidence (ManipulationRisk.toString dec.ManipulationRisk) dec.Rationale
+                    | [] -> printfn "  (no survivors to evaluate in Stage 2)"
             with ex ->
-                eprintfn "  Gemini probe failed: %s" ex.Message
+                eprintfn "  Discovery probe failed: %s" ex.Message
     }
 
 let private buildOrch (logger : ILogger) (cfg : AppSettings) : Broker * Orchestrator =
@@ -263,7 +269,7 @@ let main argv =
         | _ ->
             eprintfn "Usage: TradingBot [--probe | --once | --report | --decisions [n]]"
             eprintfn "  (no args)       run the cycle loop (hourly, only while the market is open)"
-            eprintfn "  --probe         smoke-test Alpaca, market data, RSS feeds, and Gemini"
+            eprintfn "  --probe         smoke-test Alpaca + the two-stage discovery pipeline"
             eprintfn "  --once          run a single cycle and exit"
             eprintfn "  --report        portfolio with live mark-to-market P&L + recent trades"
             eprintfn "  --decisions [n] print the last n LLM decision cycles (default 3)"

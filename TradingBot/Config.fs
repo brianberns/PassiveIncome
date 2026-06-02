@@ -27,6 +27,12 @@ type AlpacaSettings = {
     Paper  : bool             // true = paper-api, false = live-api
 }
 
+type DiscoverySettings = {
+    MinSharePrice        : decimal   // liquidity floor: minimum share price for new candidates
+    MinAvgDollarVolume   : decimal   // liquidity floor: minimum avg daily dollar volume
+    MaxCandidatesPerCycle : int      // cap on stage-1 candidates evaluated per cycle
+}
+
 type AppSettings = {
     StartingCashUsd    : decimal
     CycleIntervalHours : float
@@ -35,6 +41,7 @@ type AppSettings = {
     DatabasePath       : string
     Llm                : LlmSettings
     Alpaca             : AlpacaSettings
+    Discovery          : DiscoverySettings
     Risk               : RiskSettings
 }
 
@@ -77,9 +84,9 @@ module Config =
                 .AddUserSecrets(thisAssembly, true)
         let cfg : IConfiguration = builder.Build()
 
+        // Assets is now an optional seed/allowlist — empty means pure news-driven
+        // discovery. (Kept so a curated allowlist can be switched on trivially.)
         let assets = readAssets cfg
-        if assets.IsEmpty then
-            failwith "Configuration must specify a non-empty Assets array"
 
         {
             StartingCashUsd    = requireDecimal cfg "StartingCashUsd"
@@ -96,6 +103,11 @@ module Config =
                 KeyId  = optional    cfg "Alpaca:KeyId" ""
                 Secret = optional    cfg "Alpaca:Secret" ""
                 Paper  = optionalBool cfg "Alpaca:Paper" true
+            }
+            Discovery = {
+                MinSharePrice         = requireDecimal cfg "Discovery:MinSharePrice"
+                MinAvgDollarVolume    = requireDecimal cfg "Discovery:MinAvgDollarVolume"
+                MaxCandidatesPerCycle = requireInt     cfg "Discovery:MaxCandidatesPerCycle"
             }
             Risk = {
                 MinTradeUsd           = requireDecimal cfg "Risk:MinTradeUsd"

@@ -16,6 +16,11 @@ type TradeAction =
     | Sell
     | Hold
 
+type ManipulationRisk =
+    | Low
+    | Medium
+    | High
+
 module Asset =
     let value (Asset s) = s
 
@@ -34,13 +39,23 @@ module Qty =
 
 module TradeAction =
     let tryParse (s : string) =
-        match s.Trim() with
+        match (if isNull s then "" else s.Trim()) with
         | "Buy"  -> Some Buy
         | "Sell" -> Some Sell
         | "Hold" -> Some Hold
         | _      -> None
     let toString = function
         | Buy -> "Buy" | Sell -> "Sell" | Hold -> "Hold"
+
+module ManipulationRisk =
+    let tryParse (s : string) =
+        match (if isNull s then "" else s.Trim().ToLowerInvariant()) with
+        | "low"    -> Some Low
+        | "medium" -> Some Medium
+        | "high"   -> Some High
+        | _        -> None
+    let toString = function
+        | Low -> "Low" | Medium -> "Medium" | High -> "High"
 
 type NewsItem = {
     Id      : string
@@ -72,11 +87,24 @@ type Portfolio = {
 }
 
 type Decision = {
-    Asset      : Asset
-    Action     : TradeAction
-    SizeUsd    : Usd
-    Confidence : float
-    Rationale  : string
+    Asset            : Asset
+    Action           : TradeAction
+    SizeUsd          : Usd
+    Confidence       : float
+    ManipulationRisk : ManipulationRisk
+    Rationale        : string
+}
+
+/// A ticker surfaced by stage-1 news discovery, with the LLM's reason.
+type Candidate = {
+    Ticker : Asset
+    Reason : string
+}
+
+/// Alpaca asset metadata needed before we trade a discovered ticker.
+type AssetInfo = {
+    Tradable     : bool
+    Fractionable : bool
 }
 
 type Order = {
@@ -87,12 +115,13 @@ type Order = {
 }
 
 type Fill = {
-    Asset  : Asset
-    Side   : TradeAction
-    Qty    : Qty
-    Price  : Usd                  // execution price after slippage
-    FeeUsd : Usd
-    At     : DateTimeOffset
+    Asset   : Asset
+    Side    : TradeAction
+    Qty     : Qty
+    Price   : Usd                 // execution price after slippage
+    FeeUsd  : Usd
+    AddvUsd : decimal option      // avg daily dollar volume at fill time (liquidity context)
+    At      : DateTimeOffset
 }
 
 type Trade = {
@@ -101,6 +130,7 @@ type Trade = {
     Qty           : Qty
     PriceUsd      : Usd
     FeeUsd        : Usd
+    AddvUsd       : decimal option
     At            : DateTimeOffset
     BrokerOrderId : string option
 }

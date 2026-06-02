@@ -47,6 +47,7 @@ module Persistence =
             qty TEXT NOT NULL,
             price_usd TEXT NOT NULL,
             fee_usd TEXT NOT NULL,
+            addv_usd TEXT,
             broker_order_id TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_trades_asset_ts ON trades(asset, ts);
@@ -150,16 +151,21 @@ module Persistence =
                 tx.Commit()
 
             RecordTrade = fun t ->
+                let addvParam : obj =
+                    match t.AddvUsd with
+                    | Some v -> box (toText v)
+                    | None   -> box DBNull.Value
                 exec """INSERT INTO trades
-                        (ts, asset, side, qty, price_usd, fee_usd, broker_order_id)
-                        VALUES ($ts, $a, $s, $q, $p, $f, $oid)"""
-                    [ "$ts",  box (toTs t.At)
-                      "$a",   box (Asset.value t.Asset)
-                      "$s",   box (TradeAction.toString t.Side)
-                      "$q",   box (toText (Qty.value t.Qty))
-                      "$p",   box (toText (Usd.value t.PriceUsd))
-                      "$f",   box (toText (Usd.value t.FeeUsd))
-                      "$oid", nullableString t.BrokerOrderId ]
+                        (ts, asset, side, qty, price_usd, fee_usd, addv_usd, broker_order_id)
+                        VALUES ($ts, $a, $s, $q, $p, $f, $addv, $oid)"""
+                    [ "$ts",   box (toTs t.At)
+                      "$a",    box (Asset.value t.Asset)
+                      "$s",    box (TradeAction.toString t.Side)
+                      "$q",    box (toText (Qty.value t.Qty))
+                      "$p",    box (toText (Usd.value t.PriceUsd))
+                      "$f",    box (toText (Usd.value t.FeeUsd))
+                      "$addv", addvParam
+                      "$oid",  nullableString t.BrokerOrderId ]
                 |> ignore
 
             RecordDecisionCycle = fun ts rawResp decisionsJson appliedJson ->
@@ -204,7 +210,7 @@ module Persistence =
 
             RecentTrades = fun sinceHours ->
                 let cutoff = DateTimeOffset.UtcNow.AddHours(-sinceHours)
-                query """SELECT ts, asset, side, qty, price_usd, fee_usd, broker_order_id
+                query """SELECT ts, asset, side, qty, price_usd, fee_usd, addv_usd, broker_order_id
                          FROM trades WHERE ts >= $cut ORDER BY ts DESC"""
                     [ "$cut", box (toTs cutoff) ]
                     (fun r ->
@@ -212,13 +218,14 @@ module Persistence =
                             match TradeAction.tryParse (r.GetString(2)) with
                             | Some a -> a
                             | None   -> Hold
-                        let oid =
-                            if r.IsDBNull(6) then None else Some (r.GetString(6))
+                        let addv = if r.IsDBNull(6) then None else Some (parseDec (r.GetString(6)))
+                        let oid  = if r.IsDBNull(7) then None else Some (r.GetString(7))
                         { Asset         = Asset (r.GetString(1))
                           Side          = side
                           Qty           = Qty (parseDec (r.GetString(3)))
                           PriceUsd      = Usd (parseDec (r.GetString(4)))
                           FeeUsd        = Usd (parseDec (r.GetString(5)))
+                          AddvUsd       = addv
                           At            = parseTs (r.GetString(0))
                           BrokerOrderId = oid })
 

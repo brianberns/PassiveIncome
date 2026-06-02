@@ -9,12 +9,16 @@ open System.Threading.Tasks
 open System.Xml
 
 type News = {
-    Fetch : Asset list -> Task<NewsItem list>
+    /// World/financial top-stories feeds — drives stage-1 discovery.
+    FetchGeneral : unit -> Task<NewsItem list>
+    /// Headlines for a single ticker — drives stage-2 per-asset evaluation.
+    FetchForTicker : Asset -> Task<NewsItem list>
 }
 
 module News =
 
     let private maxHeadlinesPerCycle = 30
+    let private maxTickerHeadlines   = 12
     let private freshnessWindowHours = 36.0   // equities: span weekends/overnight gaps
     let private maxSummaryChars      = 400
 
@@ -31,12 +35,17 @@ module News =
                 collapsed.Substring(0, maxSummaryChars).TrimEnd() + "…"
             else collapsed
 
-    /// Feeds for this cycle: one ticker-scoped Yahoo Finance feed built from the
-    /// asset list, plus a general market feed for macro context.
-    let private feedsFor (assets : Asset list) : (string * string) list =
-        let tickers = assets |> List.map Asset.value |> String.concat ","
-        [ "Yahoo",       sprintf "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US" tickers
-          "MarketWatch", "http://feeds.marketwatch.com/marketwatch/topstories/" ]
+    /// General world/financial feeds for stage-1 discovery (no ticker scope).
+    let private generalFeeds : (string * string) list =
+        [ "MarketWatch", "http://feeds.marketwatch.com/marketwatch/topstories/"
+          "YahooTop",    "https://finance.yahoo.com/news/rssindex"
+          "CNBC",        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114" ]
+
+    /// Per-ticker Yahoo Finance headline feed for stage-2 evaluation.
+    let private tickerFeed (asset : Asset) : string * string =
+        "Yahoo",
+        sprintf "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US"
+                (Asset.value asset)
 
     let private fetchFeed (httpClient : HttpClient) (sourceName : string) (url : string) =
         task {
@@ -69,21 +78,27 @@ module News =
                 return []   // tolerate a broken/unavailable feed
         }
 
+    let private gather (httpClient : HttpClient) (feeds : (string * string) list) (limit : int) =
+        task {
+            let cutoff = DateTimeOffset.UtcNow.AddHours(-freshnessWindowHours)
+            let! results =
+                feeds
+                |> List.map (fun (name, url) -> fetchFeed httpClient name url)
+                |> Task.WhenAll
+            return
+                results
+                |> Array.collect List.toArray
+                |> Array.filter (fun n -> n.At >= cutoff)
+                |> Array.sortByDescending (fun n -> n.At)
+                |> Array.truncate limit
+                |> Array.toList
+        }
+
     let create (httpClient : HttpClient) : News =
         {
-            Fetch = fun assets ->
-                task {
-                    let cutoff = DateTimeOffset.UtcNow.AddHours(-freshnessWindowHours)
-                    let! results =
-                        feedsFor assets
-                        |> List.map (fun (name, url) -> fetchFeed httpClient name url)
-                        |> Task.WhenAll
-                    return
-                        results
-                        |> Array.collect List.toArray
-                        |> Array.filter (fun n -> n.At >= cutoff)
-                        |> Array.sortByDescending (fun n -> n.At)
-                        |> Array.truncate maxHeadlinesPerCycle
-                        |> Array.toList
-                }
+            FetchGeneral = fun () ->
+                gather httpClient generalFeeds maxHeadlinesPerCycle
+
+            FetchForTicker = fun asset ->
+                gather httpClient [ tickerFeed asset ] maxTickerHeadlines
         }
