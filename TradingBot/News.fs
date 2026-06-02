@@ -36,11 +36,13 @@ module News =
                 collapsed.Substring(0, maxSummaryChars).TrimEnd() + "…"
             else collapsed
 
-    /// General world/financial feeds for stage-1 discovery (no ticker scope).
+    /// General market feeds for stage-1 discovery (no ticker scope). Both carry
+    /// article summaries and current pubdates. (Dropped MarketWatch topstories —
+    /// returns 0 items for us now — and Yahoo's rssindex — headline-only, no
+    /// summaries. Yahoo's ^GSPC headline endpoint gives summary-rich market news.)
     let private generalFeeds : (string * string) list =
-        [ "MarketWatch", "http://feeds.marketwatch.com/marketwatch/topstories/"
-          "YahooTop",    "https://finance.yahoo.com/news/rssindex"
-          "CNBC",        "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114" ]
+        [ "CNBC",  "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+          "Yahoo", "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US" ]
 
     /// Per-ticker Yahoo Finance headline feed for stage-2 evaluation.
     /// Yahoo uses a hyphen for share-class tickers (BRK-B) where Alpaca/our
