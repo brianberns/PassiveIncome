@@ -7,6 +7,7 @@ open System.ServiceModel.Syndication
 open System.Text.RegularExpressions
 open System.Threading.Tasks
 open System.Xml
+open Microsoft.Extensions.Logging
 
 type News = {
     /// World/financial top-stories feeds — drives stage-1 discovery.
@@ -50,7 +51,7 @@ module News =
         sprintf "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%s&region=US&lang=en-US"
                 yahooSym
 
-    let private fetchFeed (httpClient : HttpClient) (sourceName : string) (url : string) =
+    let private fetchFeed (logger : ILogger) (httpClient : HttpClient) (sourceName : string) (url : string) =
         task {
             try
                 use! response = httpClient.GetAsync(url)
@@ -76,17 +77,20 @@ module News =
                             Summary = summary
                             Url     = link
                             At      = item.PublishDate } ]
-                return items
-            with _ ->
-                return []   // tolerate a broken/unavailable feed
+                // Never hand the LLM a contentless item.
+                return items |> List.filter (fun n -> not (String.IsNullOrWhiteSpace n.Title))
+            with ex ->
+                // Surface the failure instead of silently masquerading as "no news".
+                logger.LogWarning(sprintf "News feed '%s' fetch failed: %s" sourceName ex.Message)
+                return []
         }
 
-    let private gather (httpClient : HttpClient) (feeds : (string * string) list) (limit : int) =
+    let private gather (logger : ILogger) (httpClient : HttpClient) (feeds : (string * string) list) (limit : int) =
         task {
             let cutoff = DateTimeOffset.UtcNow.AddHours(-freshnessWindowHours)
             let! results =
                 feeds
-                |> List.map (fun (name, url) -> fetchFeed httpClient name url)
+                |> List.map (fun (name, url) -> fetchFeed logger httpClient name url)
                 |> Task.WhenAll
             return
                 results
@@ -97,11 +101,11 @@ module News =
                 |> Array.toList
         }
 
-    let create (httpClient : HttpClient) : News =
+    let create (logger : ILogger) (httpClient : HttpClient) : News =
         {
             FetchGeneral = fun () ->
-                gather httpClient generalFeeds maxHeadlinesPerCycle
+                gather logger httpClient generalFeeds maxHeadlinesPerCycle
 
             FetchForTicker = fun asset ->
-                gather httpClient [ tickerFeed asset ] maxTickerHeadlines
+                gather logger httpClient [ tickerFeed asset ] maxTickerHeadlines
         }

@@ -182,7 +182,7 @@ let private runProbe (cfg : AppSettings) =
             printfn "  (Gemini API key not set — skipping)"
         else
             try
-                let news   = News.create http
+                let news   = News.create (makeLogger ()) http
                 let agent  = Agent.create (makeChatClient cfg) cfg
                 let _, data = makeAlpacaClients cfg
                 let prices = Prices.create data
@@ -244,7 +244,7 @@ let private buildOrch (logger : ILogger) (cfg : AppSettings) : Broker * Orchestr
     let trading, data = makeAlpacaClients cfg
     let prices      = Prices.create data
     let http        = newHttpClient ()
-    let news        = News.create http
+    let news        = News.create logger http
     let broker      = makeBroker cfg db trading prices
     let chat        = makeChatClient cfg
     let agent       = Agent.create chat cfg
