@@ -155,6 +155,13 @@ module Orchestrator =
 
                     let priceSnapList = List.ofSeq priceSnaps
 
+                    // Surface the LLM's per-symbol reasoning in the live log.
+                    for d in decisionList do
+                        logger.LogInformation(
+                            sprintf "%s %s (conf %.2f, manip %s): %s"
+                                (Asset.value d.Asset) (TradeAction.toString d.Action)
+                                d.Confidence (ManipulationRisk.toString d.ManipulationRisk) d.Rationale)
+
                     // --- Risk overlay ---
                     let outcome =
                         Risk.validateAndSize
