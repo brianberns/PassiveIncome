@@ -183,21 +183,30 @@ let private runProbe (cfg : AppSettings) =
                                 (Asset.value c.Ticker) (Usd.value snap.PriceUsd) addv
                                 (if pass then "PASS" else "below floor") c.Reason
                             if pass then survivors.Add snap
-                    // Stage 2 on the first survivor to confirm the per-asset path
+                    // Stage 2: one batched call over all survivors
                     match List.ofSeq survivors with
-                    | snap :: _ ->
+                    | [] -> printfn "  (no survivors to evaluate in Stage 2)"
+                    | snaps ->
                         printfn ""
-                        printfn "  Stage 2 sample (%s):" (Asset.value snap.Asset)
+                        printfn "  Stage 2 (batched, %d assets):" (List.length snaps)
                         let portfolio = { CashUsd = Usd cfg.StartingCashUsd; Positions = Map.empty; AsOf = DateTimeOffset.UtcNow }
-                        let! tnews = news.FetchForTicker snap.Asset
-                        let! d = agent.EvaluateAsset trend portfolio snap tnews
+                        let! items =
+                            snaps
+                            |> List.map (fun snap ->
+                                task {
+                                    let! tnews = news.FetchForTicker snap.Asset
+                                    return snap, tnews
+                                })
+                            |> System.Threading.Tasks.Task.WhenAll
+                        let! d = agent.EvaluateAssets trend portfolio (List.ofArray items)
                         match d with
                         | Error e -> eprintfn "    failed: %s" e
-                        | Ok (dec, _raw) ->
-                            printfn "    %-4s $%.2f conf=%.2f manip=%s — %s"
-                                (TradeAction.toString dec.Action) (Usd.value dec.SizeUsd)
-                                dec.Confidence (ManipulationRisk.toString dec.ManipulationRisk) dec.Rationale
-                    | [] -> printfn "  (no survivors to evaluate in Stage 2)"
+                        | Ok (decs, _raw) ->
+                            for dec in decs do
+                                printfn "    %-6s %-4s $%.2f conf=%.2f manip=%s — %s"
+                                    (Asset.value dec.Asset) (TradeAction.toString dec.Action)
+                                    (Usd.value dec.SizeUsd) dec.Confidence
+                                    (ManipulationRisk.toString dec.ManipulationRisk) dec.Rationale
             with ex ->
                 eprintfn "  Discovery probe failed: %s" ex.Message
     }

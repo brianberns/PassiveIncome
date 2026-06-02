@@ -9,9 +9,9 @@ open Alpaca.Markets
 type Broker = {
     GetPortfolio : unit -> Task<Portfolio>
     IsMarketOpen : unit -> Task<bool>
-    /// Tradability metadata for a (possibly news-discovered) ticker. None if the
-    /// broker doesn't recognise the symbol — used to drop hallucinated tickers.
-    GetAssetInfo : Asset -> Task<AssetInfo option>
+    /// Tradability metadata for a (possibly news-discovered) ticker. Error carries
+    /// the reason the lookup failed (not found vs. transient), so a skip is legible.
+    GetAssetInfo : Asset -> Task<Result<AssetInfo, string>>
     /// Place a notional market order. The decimal option is the asset's ADDV at
     /// decision time, recorded with the fill for later liquidity auditing.
     PlaceMarket  : Asset -> TradeAction -> Usd -> decimal option -> Task<Result<Fill, string>>
@@ -42,7 +42,7 @@ module PaperBroker =
             IsMarketOpen = fun () -> Task.FromResult true
 
             GetAssetInfo = fun _ ->
-                Task.FromResult (Some { Tradable = true; Fractionable = true })
+                Task.FromResult (Ok { Tradable = true; Fractionable = true })
 
             PlaceMarket = fun asset side sizeUsd addvUsd ->
                 task {
@@ -160,9 +160,9 @@ module AlpacaBroker =
                 task {
                     try
                         let! a = tradingClient.GetAssetAsync(Asset.value asset)
-                        return Some { Tradable = a.IsTradable; Fractionable = a.Fractionable }
-                    with _ ->
-                        return None   // unknown/again hallucinated symbol
+                        return Ok { Tradable = a.IsTradable; Fractionable = a.Fractionable }
+                    with ex ->
+                        return Error ex.Message
                 }
 
             PlaceMarket = fun asset side sizeUsd addvUsd ->

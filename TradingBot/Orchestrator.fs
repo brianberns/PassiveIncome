@@ -100,21 +100,21 @@ module Orchestrator =
                     let candidateAssets = cappedCandidates |> List.map (fun c -> c.Ticker)
                     let evalSet = (candidateAssets @ heldAssets) |> List.distinct
 
-                    // --- Stage 2: validate, price, liquidity-gate, and decide per asset ---
-                    let decisions    = ResizeArray<Decision>()
-                    let priceSnaps   = ResizeArray<PriceSnapshot>()
-                    let addvByAsset  = Dictionary<Asset, decimal>()
+                    // --- Gate + gather survivors (validate, price, liquidity-floor, news) ---
+                    let survivors   = ResizeArray<PriceSnapshot * NewsItem list>()
+                    let priceSnaps  = ResizeArray<PriceSnapshot>()
+                    let addvByAsset = Dictionary<Asset, decimal>()
 
                     for asset in evalSet do
                         let symbol = Asset.value asset
                         let isHeld = portfolio.Positions.ContainsKey asset
                         let! info  = broker.GetAssetInfo asset
                         match info with
-                        | Some i when not (i.Tradable && i.Fractionable) ->
+                        | Ok i when not (i.Tradable && i.Fractionable) ->
                             logger.LogInformation(sprintf "Skip %s: not tradable/fractionable" symbol)
-                        | None ->
-                            logger.LogInformation(sprintf "Skip %s: unknown to broker" symbol)
-                        | Some _ ->
+                        | Error e ->
+                            logger.LogInformation(sprintf "Skip %s: lookup failed — %s" symbol e)
+                        | Ok _ ->
                             let! priced = prices.FetchOne asset
                             match priced with
                             | None ->
@@ -139,13 +139,21 @@ module Orchestrator =
                                                 return items
                                             with _ -> return []
                                         }
-                                    let! r = agent.EvaluateAsset marketTrend portfolio snap tickerNews
-                                    match r with
-                                    | Ok (d, _raw) -> decisions.Add d
-                                    | Error e -> errors.Add e
+                                    survivors.Add (snap, tickerNews)
 
-                    let decisionList   = List.ofSeq decisions
-                    let priceSnapList  = List.ofSeq priceSnaps
+                    // --- Stage 2: one batched LLM call for all survivors ---
+                    let! decisionList =
+                        task {
+                            let! r = agent.EvaluateAssets marketTrend portfolio (List.ofSeq survivors)
+                            match r with
+                            | Ok (ds, _raw) ->
+                                // Keep only decisions for assets we actually gated in.
+                                let known = priceSnaps |> Seq.map (fun s -> s.Asset) |> Set.ofSeq
+                                return ds |> List.filter (fun d -> known.Contains d.Asset)
+                            | Error e -> errors.Add e; return []
+                        }
+
+                    let priceSnapList = List.ofSeq priceSnaps
 
                     // --- Risk overlay ---
                     let outcome =

@@ -17,9 +17,11 @@ type DiscoveryDto = {
     Candidates  : CandidateDto array
 }
 
-// --- Stage 2 (per-asset decision) wire DTO ---
+// --- Stage 2 (batched per-asset decisions) wire DTOs ---
 // Strings on enum-like fields; validated/translated to domain types after parse.
+// Ticker tags each decision so we can map it back to the asset we asked about.
 type AgentDecisionDto = {
+    Ticker           : string
     Action           : string
     SizeUsd          : decimal
     Confidence       : float
@@ -27,15 +29,20 @@ type AgentDecisionDto = {
     Rationale        : string
 }
 
+type BatchDecisionsDto = {
+    Decisions : AgentDecisionDto array
+}
+
 type Agent = {
     /// Stage 1: general news -> (market trend, candidate tickers) + raw response.
     IdentifyCandidates :
         NewsItem list -> Task<Result<(string * Candidate list) * string, string>>
-    /// Stage 2: one asset, given the market trend, portfolio, its price snapshot,
-    /// and its own news -> a Decision (incl. manipulation risk) + raw response.
-    EvaluateAsset :
-        string -> Portfolio -> PriceSnapshot -> NewsItem list
-            -> Task<Result<Decision * string, string>>
+    /// Stage 2 (one batched call): market trend, portfolio, and each asset paired
+    /// with its own news -> a Decision per asset (incl. manipulation risk) + raw.
+    /// Batched into a single LLM request to stay within the free-tier daily quota.
+    EvaluateAssets :
+        string -> Portfolio -> (PriceSnapshot * NewsItem list) list
+            -> Task<Result<Decision list * string, string>>
 }
 
 module Agent =
@@ -141,44 +148,40 @@ module Agent =
 
     // ---------------- Stage 2: per-asset decision ----------------
 
-    let private buildDecisionPrompt
+    let private buildBatchPrompt
         (cfg : AppSettings) (marketTrend : string) (portfolio : Portfolio)
-        (price : PriceSnapshot) (news : NewsItem list) : string =
+        (items : (PriceSnapshot * NewsItem list) list) : string =
         let sb = StringBuilder()
         let w (s : string) = sb.AppendLine(s) |> ignore
-        let symbol = Asset.value price.Asset
 
-        w (sprintf "You are a cautious trader deciding what to do about ONE stock: %s." symbol)
+        w "You are a cautious trader. Decide what to do about EACH stock listed below:"
+        w "return exactly one decision per ticker (Buy, Sell, or Hold)."
         w "Bias toward Hold. Only Buy/Sell when the news and price give a clear, well-founded reason."
         w ""
-        w "Assess manipulation risk explicitly. Treat hype, vague 'huge potential' language,"
-        w "thin-float/penny-stock promotion, or coordinated-pump signals as strong reasons to"
-        w "avoid buying (and to sell if held). Report it as manipulationRisk = Low | Medium | High."
+        w "Assess manipulation risk explicitly per ticker. Treat hype, vague 'huge potential'"
+        w "language, thin-float/penny-stock promotion, or coordinated-pump signals as strong"
+        w "reasons to avoid buying (and to sell if held). Report manipulationRisk = Low | Medium | High."
         w ""
         w "## Overall market trend"
         w (if String.IsNullOrWhiteSpace marketTrend then "  (none provided)" else "  " + marketTrend)
         w ""
         w "## Portfolio"
         w (sprintf "Cash: $%.2f" (Usd.value portfolio.CashUsd))
-        match Map.tryFind price.Asset portfolio.Positions with
-        | Some p ->
-            w (sprintf "Current position in %s: qty=%.6f avgCost=$%.4f"
-                   symbol (Qty.value p.Qty) (Usd.value p.AvgCostUsd))
-        | None ->
-            w (sprintf "No current position in %s." symbol)
         w ""
-        w "## Price"
-        w (sprintf "  %s: $%.4f (1d: %+.2f%%, 5d: %+.2f%%)"
-               symbol (Usd.value price.PriceUsd) price.Change24hPct price.Change7dPct)
-        w ""
-        w (sprintf "## Recent %s news" symbol)
-        if List.isEmpty news then
-            w "  (no fresh ticker-specific news)"
-        else
-            for n in news |> List.truncate 12 do
-                w (sprintf "  [%s] %s" n.Source n.Title)
-                if n.Summary <> "" then w (sprintf "      %s" n.Summary)
-        w ""
+        for (price, news) in items do
+            let symbol = Asset.value price.Asset
+            w (sprintf "### %s — $%.4f (1d: %+.2f%%, 5d: %+.2f%%)"
+                   symbol (Usd.value price.PriceUsd) price.Change24hPct price.Change7dPct)
+            match Map.tryFind price.Asset portfolio.Positions with
+            | Some p -> w (sprintf "  Position: qty=%.6f avgCost=$%.4f" (Qty.value p.Qty) (Usd.value p.AvgCostUsd))
+            | None   -> w "  Position: none"
+            if List.isEmpty news then
+                w "  News: (none fresh)"
+            else
+                for n in news |> List.truncate 8 do
+                    w (sprintf "  [%s] %s" n.Source n.Title)
+                    if n.Summary <> "" then w (sprintf "      %s" n.Summary)
+            w ""
         w "## Constraints"
         w (sprintf "- Minimum trade size: $%.2f" cfg.Risk.MinTradeUsd)
         w (sprintf "- Maximum trade size: $%.2f" cfg.Risk.MaxTradeUsd)
@@ -186,27 +189,31 @@ module Agent =
         w (sprintf "- Keep at least %.0f%% in cash" (cfg.Risk.CashReservePct * 100.0))
         w (sprintf "- %.0fh cooldown between trades on the same asset" cfg.Risk.PerAssetCooldownHours)
         w ""
-        w "Output JSON: { action, sizeUsd, confidence, manipulationRisk, rationale }."
+        w "Output JSON: a decisions array with one entry per ticker above, each"
+        w "{ ticker, action, sizeUsd, confidence, manipulationRisk, rationale }."
         sb.ToString()
 
-    let private toDecision (asset : Asset) (dto : AgentDecisionDto) : Decision =
-        let baseRationale = if isNull dto.Rationale then "" else dto.Rationale
-        // A missing/garbled action defaults to Hold — we never trade on a
-        // malformed response. Flagged in the rationale so it stays visible.
-        let action, rationale =
-            match TradeAction.tryParse dto.Action with
-            | Some a -> a, baseRationale
-            | None   -> Hold, "[no valid action returned] " + baseRationale
-        // Unparseable manipulation risk defaults to High (most cautious).
-        let mr = ManipulationRisk.tryParse dto.ManipulationRisk |> Option.defaultValue High
-        {
-            Asset            = asset
-            Action           = action
-            SizeUsd          = Usd dto.SizeUsd
-            Confidence       = dto.Confidence
-            ManipulationRisk = mr
-            Rationale        = rationale
-        }
+    let private toDecision (dto : AgentDecisionDto) : Decision option =
+        let ticker = if isNull dto.Ticker then "" else dto.Ticker.Trim().ToUpperInvariant()
+        if ticker = "" then None
+        else
+            let baseRationale = if isNull dto.Rationale then "" else dto.Rationale
+            // A missing/garbled action defaults to Hold — we never trade on a
+            // malformed response. Flagged in the rationale so it stays visible.
+            let action, rationale =
+                match TradeAction.tryParse dto.Action with
+                | Some a -> a, baseRationale
+                | None   -> Hold, "[no valid action returned] " + baseRationale
+            // Unparseable manipulation risk defaults to High (most cautious).
+            let mr = ManipulationRisk.tryParse dto.ManipulationRisk |> Option.defaultValue High
+            Some {
+                Asset            = Asset ticker
+                Action           = action
+                SizeUsd          = Usd dto.SizeUsd
+                Confidence       = dto.Confidence
+                ManipulationRisk = mr
+                Rationale        = rationale
+            }
 
     let create (chatClient : IChatClient) (cfg : AppSettings) : Agent =
         {
@@ -221,12 +228,18 @@ module Agent =
                         return Ok ((trend, toCandidates dto), raw)
                 }
 
-            EvaluateAsset = fun marketTrend portfolio price news ->
+            EvaluateAssets = fun marketTrend portfolio items ->
                 task {
-                    let prompt = buildDecisionPrompt cfg marketTrend portfolio price news
-                    let! r = callStructured<AgentDecisionDto> chatClient prompt
-                    match r with
-                    | Error e -> return Error (sprintf "EvaluateAsset(%s) %s" (Asset.value price.Asset) e)
-                    | Ok (dto, raw) -> return Ok (toDecision price.Asset dto, raw)
+                    if List.isEmpty items then
+                        return Ok ([], "")
+                    else
+                        let prompt = buildBatchPrompt cfg marketTrend portfolio items
+                        let! r = callStructured<BatchDecisionsDto> chatClient prompt
+                        match r with
+                        | Error e -> return Error (sprintf "EvaluateAssets %s" e)
+                        | Ok (dto, raw) ->
+                            let decisions =
+                                dto.Decisions |> Array.choose toDecision |> Array.toList
+                            return Ok (decisions, raw)
                 }
         }
