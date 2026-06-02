@@ -15,7 +15,7 @@ type Persistence = {
     LastTradeAt         : Asset -> DateTimeOffset option
     RecentTrades        : float -> Trade list
     SeenNewsIds         : unit -> Set<string>
-    RecentDecisionCycles : int -> (DateTimeOffset * string) list
+    RecentDecisionCycles : int -> (DateTimeOffset * string * string * string) list
 }
 
 module Persistence =
@@ -234,7 +234,8 @@ module Persistence =
                 |> Set.ofList
 
             RecentDecisionCycles = fun n ->
-                query "SELECT ts, raw_response FROM decisions ORDER BY id DESC LIMIT $n"
+                query """SELECT ts, raw_response, decisions_json, applied_json
+                         FROM decisions ORDER BY id DESC LIMIT $n"""
                       [ "$n", box (int64 n) ]
-                      (fun r -> parseTs (r.GetString(0)), r.GetString(1))
+                      (fun r -> parseTs (r.GetString(0)), r.GetString(1), r.GetString(2), r.GetString(3))
         }

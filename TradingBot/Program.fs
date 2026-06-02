@@ -122,13 +122,18 @@ let private runDecisions (cfg : AppSettings) (n : int) =
     else
         printfn "Last %d decision cycle(s), newest first:" (List.length cycles)
         let indented = System.Text.Json.JsonSerializerOptions(WriteIndented = true)
-        for (ts, raw) in cycles do
+        let pretty (label : string) (json : string) =
+            printfn "-- %s --" label
+            try
+                use doc = System.Text.Json.JsonDocument.Parse(json)
+                printfn "%s" (System.Text.Json.JsonSerializer.Serialize(doc.RootElement, indented))
+            with _ -> printfn "%s" json
+        for (ts, discovery, decisions, fills) in cycles do
             printfn ""
             printfn "=== %s ===" (ts.ToString("u"))
-            try
-                use doc = System.Text.Json.JsonDocument.Parse(raw)
-                printfn "%s" (System.Text.Json.JsonSerializer.Serialize(doc.RootElement, indented))
-            with _ -> printfn "%s" raw
+            pretty "discovery (stage 1)" discovery
+            pretty "decisions (stage 2)" decisions
+            pretty "fills" fills
 
 let private runAssetLookup (cfg : AppSettings) (symbol : string) =
     task {
