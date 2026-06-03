@@ -29,9 +29,13 @@ module Program =
             printfn $"Error in {feed.Name} news feed: {ex.Message}"
 
         let items =
+            let now = DateTime.UtcNow
+            let oneDay = TimeSpan.FromDays(1)
             items
                 |> Seq.concat
                 |> Seq.distinctBy _.Id
+                |> Seq.where (fun item ->
+                    now - item.PublishDate.UtcDateTime < oneDay)
                 |> Seq.sortByDescending _.PublishDate
         for item in items do
             printfn ""
