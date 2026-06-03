@@ -14,25 +14,43 @@ let feedUrls =
 
 let getItems (httpClient : HttpClient) (feedUrl : string) =
     task {
-        let! rssXml = httpClient.GetStringAsync(feedUrl)
-        use stringReader = new StringReader(rssXml)
-        use xmlReader = XmlReader.Create(stringReader)
-        let feed = SyndicationFeed.Load(xmlReader)
-        for item in feed.Items do
-            item.SourceFeed <- feed   // ick
-        return feed.Items
+        try
+            let! rssXml = httpClient.GetStringAsync(feedUrl)
+            use stringReader = new StringReader(rssXml)
+            use xmlReader = XmlReader.Create(stringReader)
+            let feed = SyndicationFeed.Load(xmlReader)
+            for item in feed.Items do
+                item.SourceFeed <- feed   // ick
+            return Ok feed.Items
+        with ex ->
+            return Error $"{feedUrl}: {ex.Message}"
     } |> Async.AwaitTask
 
 do
+        // create HTTP client
     use httpClient =
         let client = new HttpClient()
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
+        client.DefaultRequestHeaders
+            .UserAgent
+            .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
         client
-    let items =
+
+        // fetch news items
+    let items, errors =
         feedUrls
             |> Seq.map (getItems httpClient)
             |> Async.Parallel
             |> Async.RunSynchronously
+            |> Array.partitionWith (function
+                | Ok items -> Choice1Of2 items
+                | Error message -> Choice2Of2 message)
+
+        // log errors
+    for error in errors do
+        printfn $"Error: {error}"
+
+    let items =
+        items
             |> Seq.concat
             |> Seq.distinctBy _.Id
             |> Seq.sortByDescending _.PublishDate
