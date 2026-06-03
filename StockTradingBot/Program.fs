@@ -26,7 +26,7 @@ module Program =
 
             // log errors
         for feed, ex in errors do
-            printfn $"Error in {feed.Name} feed: {ex.Message}"
+            printfn $"Error in {feed.Name} news feed: {ex.Message}"
 
         let items =
             items
@@ -35,8 +35,8 @@ module Program =
                 |> Seq.sortByDescending _.PublishDate
         for item in items do
             printfn ""
-            printfn $"{item.SourceFeed.Title.Text}"
+            printfn "----------"
             printfn $"{item.Title.Text}"
+            printfn $"{item.Summary.Text}"
+            printfn $"{item.SourceFeed.Title.Text}"
             printfn $"{DateTime.UtcNow - item.PublishDate.UtcDateTime}"
-            if item.Summary <> null then
-                printfn $"{item.Summary.Text}"
