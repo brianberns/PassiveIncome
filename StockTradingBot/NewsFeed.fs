@@ -33,19 +33,16 @@ module NewsFeed =
                         if newsFeed.Filter item.Title.Text then
                             item.SourceFeed <- feed   // ick
                             item
+                        else
+                            printfn $"Ignored news item: {item.Title.Text}"
                 ]
             with ex ->
                 return Error (newsFeed, ex)
         } |> Async.AwaitTask
 
     let private isPersonal (text : string) =
-        let tokens =
-            text
-                .ToLower()
-                .Split([| ' '; ''' |])
-                |> set
-        tokens.Contains("i")
-            || tokens.Contains("you")
+        text.Split([| ' '; ''' |])
+            |> Array.contains("I")
 
     let feeds =
         [
