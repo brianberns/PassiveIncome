@@ -32,3 +32,9 @@ module Agent =
             GoogleClient = googleClient
             ChatClient = chatClient
         }
+
+    let getResponseAsync<'t> agent (prompt : string) =
+        ChatClientStructuredOutputExtensions
+            .GetResponseAsync<'t>(
+                agent.ChatClient,
+                prompt)

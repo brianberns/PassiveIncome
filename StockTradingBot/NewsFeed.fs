@@ -5,20 +5,31 @@ open System.Net.Http
 open System.ServiceModel.Syndication
 open System.Xml
 
+type NewsItemFilter = SyndicationItem -> bool
+
+module NewsItemFilter =
+
+    let defaultFilter (item : SyndicationItem) =
+        item.Summary <> null
+
+    let applyFilters filters item =
+        Seq.forall (fun (filter : NewsItemFilter) ->
+            filter item) filters
+
 type NewsFeed =
     {
         Name : string
         Url : string
-        Filter : string -> bool
+        Filters : seq<NewsItemFilter>
     }
 
 module NewsFeed =
 
-    let create name url filter =
+    let create name url filters =
         {
             Name = name
             Url = url
-            Filter = filter
+            Filters = filters
         }
 
     let getItems (httpClient : HttpClient) newsFeed =
@@ -30,18 +41,22 @@ module NewsFeed =
                 let feed = SyndicationFeed.Load(xmlReader)
                 return Ok [
                     for item in feed.Items do
-                        if newsFeed.Filter item.Title.Text then
+                        if NewsItemFilter.applyFilters newsFeed.Filters item then
                             item.SourceFeed <- feed   // ick
                             item
                         else
-                            printfn $"Ignored news item: {item.Title.Text}"
+                            printfn ""
+                            printfn "Ignored news item:"
+                            printfn $"{item.Title.Text}"
+                            if item.Summary <> null then
+                                printfn $"{item.Summary.Text}"
                 ]
             with ex ->
                 return Error (newsFeed, ex)
         } |> Async.AwaitTask
 
-    let private isPersonal (text : string) =
-        text.Split([| ' '; ''' |])
+    let private isPersonal (item : SyndicationItem) =
+        item.Title.Text.Split([| ' '; ''' |])
             |> Array.contains("I")
 
     let feeds =
@@ -49,17 +64,20 @@ module NewsFeed =
             create
                 "MarketWatch Top Stories"
                 "https://feeds.content.dowjones.io/public/rss/mw_topstories"
-                (isPersonal >> not)   // filter out personal finance stories
+                [
+                    NewsItemFilter.defaultFilter
+                    (isPersonal >> not)   // filter out personal finance stories
+                ]
             create
                 "CNBC Top News"
                 "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
-                (fun _ -> true)
+                [ NewsItemFilter.defaultFilter ]
             create
                 "CNBC Finance"
                 "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
-                (fun _ -> true)
+                [ NewsItemFilter.defaultFilter ]
             create
                 "Yahoo S&P 500"
                 "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"   // ^GSPC = S&P 500
-                (fun _ -> true)
+                [ NewsItemFilter.defaultFilter ]
         ]

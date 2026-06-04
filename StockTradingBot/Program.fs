@@ -4,8 +4,19 @@ open System
 open System.Net.Http
 open System.Reflection
 
-open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
+
+type Candidate =
+    {
+        Symbol : string
+        Reason : string
+    }
+
+type MarketOverview =
+    {
+        Trend : string
+        Candidates : Candidate[]
+    }
 
 module Program =
 
@@ -42,31 +53,36 @@ module Program =
                 |> Seq.where (fun item ->
                     now - item.PublishDate.UtcDateTime < oneDay)
                 |> Seq.sortByDescending _.PublishDate
-        for item in items do
-            printfn ""
-            printfn "----------"
-            printfn $"{item.Title.Text}"
-            printfn $"{item.Summary.Text}"
-            printfn $"{item.SourceFeed.Title.Text}"
-            printfn $"{DateTime.UtcNow - item.PublishDate.UtcDateTime}"
 
-    let test () =
+            // create agent
+        use agent =
+            let config =
+                let assembly = Assembly.GetExecutingAssembly()
+                ConfigurationBuilder()
+                    .AddUserSecrets(assembly)
+                    .Build()
+            Agent.create config
 
-        let config =
-            let assembly = Assembly.GetExecutingAssembly()
-            ConfigurationBuilder()
-                .AddUserSecrets(assembly)
-                .Build()
-
-        use agent = Agent.create config
         task {
-            let! response =
-                agent.ChatClient.GetResponseAsync(
-                    "Explain F# pattern matching in two sentences.")
-            printfn "%s" response.Text
+            let prompt =
+                String.concat "\n" [
+                    "As a stock trader, scan the given news items for timely ideas. \
+                    Identify a) the broad market/sector trend they collectively suggest, \
+                    and b) the specific US stock symbols that are most directly affected \
+                    and worth a closer look."
+                    for item in items do
+                        ""
+                        $"Title: {item.Title.Text}"
+                        $"Summary: {item.Summary.Text}"
+                        let age = DateTime.UtcNow - item.PublishDate.UtcDateTime
+                        $"Publication age: {age.TotalHours} hours"
+                ]
+            printfn ""
+            printfn "%s" prompt
+            // let! response = Agent.getResponseAsync agent prompt
+            // printfn "%s" response.Text
         }
             |> Async.AwaitTask
             |> Async.RunSynchronously
 
-    // run ()
-    test ()
+    run ()
