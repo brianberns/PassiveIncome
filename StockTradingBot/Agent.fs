@@ -1,9 +1,22 @@
 namespace StockTradingBot
 
 open System
+open System.ServiceModel.Syndication
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
+
+type Candidate =
+    {
+        Symbol : string
+        Reason : string
+    }
+
+type MarketOverview =
+    {
+        Trend : string
+        Candidates : Candidate[]
+    }
 
 type Agent =
     {
@@ -33,7 +46,24 @@ module Agent =
             ChatClient = chatClient
         }
 
-    let getResultAsync<'t> agent (prompt : string) =
+    let private getOverviewPrompt utcNow items =
+        String.concat "\n" [
+            "As a stock trader, scan the news items below for timely ideas. \
+            Identify a) the broad market/sector trend they collectively suggest, \
+            and b) the specific US stock symbols that are most directly affected \
+            and worth a closer look. Return ONLY ticker symbols (not company names) \
+            for liquid US equities."
+            for (item : SyndicationItem) in items do
+                ""
+                $"Title: {item.Title.Text}"
+                $"Summary: {item.Summary.Text}"
+                let hours =
+                    let age = utcNow - item.PublishDate.UtcDateTime
+                    Math.Round(age.TotalHours, 1).ToString("F1")
+                $"Publication age: {hours} hours"
+        ]
+
+    let private getResultAsync<'t> agent (prompt : string) =
         task {
             let! response =
                 ChatClientStructuredOutputExtensions
@@ -41,4 +71,33 @@ module Agent =
                         agent.ChatClient,
                         prompt)
             return response.Result
+        } |> Async.AwaitTask
+
+    let getMarketOverviewAsync agent httpClient =
+        task {
+                // fetch news items
+            let! results =
+                NewsFeed.feeds
+                    |> Seq.map (NewsFeed.getItems httpClient)
+                    |> Async.Parallel
+            let items, errors =
+                results
+                    |> Array.partitionWith (function
+                        | Ok items -> Choice1Of2 items
+                        | Error error -> Choice2Of2 error)
+
+                // log errors
+            for feed, ex in errors do
+                printfn $"Error in {feed.Name} news feed: {ex.Message}"
+
+            let utcNow = DateTime.UtcNow
+            let oneDay = TimeSpan.FromDays(1)
+            return! items
+                |> Seq.concat
+                |> Seq.distinctBy _.Id
+                |> Seq.where (fun item ->
+                    utcNow - item.PublishDate.UtcDateTime < oneDay)
+                |> Seq.sortByDescending _.PublishDate
+                |> getOverviewPrompt utcNow
+                |> getResultAsync<MarketOverview> agent
         } |> Async.AwaitTask
