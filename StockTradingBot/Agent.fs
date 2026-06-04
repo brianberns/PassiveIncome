@@ -63,7 +63,7 @@ module Agent =
                 $"Publication age: {hours} hours"
         ]
 
-    let private getResultAsync<'t> agent (prompt : string) =
+    let private getResultAsync<'t> (prompt : string) agent =
         task {
             let! response =
                 ChatClientStructuredOutputExtensions
@@ -73,7 +73,7 @@ module Agent =
             return response.Result
         } |> Async.AwaitTask
 
-    let getMarketOverviewAsync agent httpClient =
+    let getMarketOverviewAsync httpClient agent =
         task {
                 // fetch news items
             let! results =
@@ -90,14 +90,15 @@ module Agent =
             for feed, ex in errors do
                 printfn $"Error in {feed.Name} news feed: {ex.Message}"
 
-            let utcNow = DateTime.UtcNow
-            let oneDay = TimeSpan.FromDays(1)
-            return! items
-                |> Seq.concat
-                |> Seq.distinctBy _.Id
-                |> Seq.where (fun item ->
-                    utcNow - item.PublishDate.UtcDateTime < oneDay)
-                |> Seq.sortByDescending _.PublishDate
-                |> getOverviewPrompt utcNow
-                |> getResultAsync<MarketOverview> agent
+            let prompt =
+                let utcNow = DateTime.UtcNow
+                let oneDay = TimeSpan.FromDays(1)
+                items
+                    |> Seq.concat
+                    |> Seq.distinctBy _.Id
+                    |> Seq.where (fun item ->
+                        utcNow - item.PublishDate.UtcDateTime < oneDay)
+                    |> Seq.sortByDescending _.PublishDate
+                    |> getOverviewPrompt utcNow
+            return! getResultAsync<MarketOverview> prompt agent
         } |> Async.AwaitTask

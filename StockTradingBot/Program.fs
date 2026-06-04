@@ -29,7 +29,7 @@ module Program =
 
         task {
             let! overview =
-                Agent.getMarketOverviewAsync agent httpClient
+                Agent.getMarketOverviewAsync httpClient agent
             printfn $"Trend: {overview.Trend}"
             for candidate in overview.Candidates do
                 printfn $"{candidate.Symbol}: {candidate.Reason}"
