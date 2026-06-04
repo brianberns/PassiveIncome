@@ -3,9 +3,12 @@
 open System
 open System.Net.Http
 
+open Microsoft.Extensions.Configuration
+
 module Program =
 
-    do
+    let run () =
+
             // create HTTP client
         use httpClient =
             let client = new HttpClient()
@@ -44,3 +47,14 @@ module Program =
             printfn $"{item.Summary.Text}"
             printfn $"{item.SourceFeed.Title.Text}"
             printfn $"{DateTime.UtcNow - item.PublishDate.UtcDateTime}"
+
+    let test () =
+        let config =
+            let assembly = typeof<NewsFeed>.Assembly
+            ConfigurationBuilder()
+                .AddUserSecrets(assembly, true)
+                .Build()
+        printfn "%s" config["Gemini:ApiKey"]
+
+    // run ()
+    test ()
