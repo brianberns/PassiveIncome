@@ -58,13 +58,10 @@ module Program =
                 .AddUserSecrets(assembly)
                 .Build()
 
-        use googleClient =
-            new Google.GenAI.Client(
-                apiKey = config["Gemini:ApiKey"])
-        let chatClient = googleClient.AsIChatClient("gemini-2.5-flash")
+        use agent = Agent.create config
         task {
             let! response =
-                chatClient.GetResponseAsync(
+                agent.ChatClient.GetResponseAsync(
                     "Explain F# pattern matching in two sentences.")
             printfn "%s" response.Text
         }
