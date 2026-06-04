@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Agent.fs" />
     <Compile Include="NewsFeed.fs" />
+    <Compile Include="Agent.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

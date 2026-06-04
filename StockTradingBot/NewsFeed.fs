@@ -10,10 +10,11 @@ type NewsItemFilter = SyndicationItem -> bool
 
 module NewsItemFilter =
 
-    let hasSummary (item : SyndicationItem) =
-        item.Summary <> null
-            && not (String.IsNullOrWhiteSpace(
-                item.Summary.Text))
+    let hasSummary : NewsItemFilter =
+        fun item ->
+            item.Summary <> null
+                && not (String.IsNullOrWhiteSpace(
+                    item.Summary.Text))
 
     let applyFilters filters item =
         Seq.forall (fun (filter : NewsItemFilter) ->
@@ -47,20 +48,15 @@ module NewsFeed =
                         if NewsItemFilter.applyFilters newsFeed.Filters item then
                             item.SourceFeed <- feed   // ick
                             item
-                        else
-                            printfn ""
-                            printfn "Ignored news item:"
-                            printfn $"{item.Title.Text}"
-                            if item.Summary <> null then
-                                printfn $"{item.Summary.Text}"
                 ]
             with ex ->
                 return Error (newsFeed, ex)
         } |> Async.AwaitTask
 
-    let private isPersonal (item : SyndicationItem) =
-        item.Title.Text.Split([| ' '; ''' |])
-            |> Array.contains("I")
+    let private isPersonal : NewsItemFilter =
+        fun item ->
+            item.Title.Text.Split([| ' '; ''' |])
+                |> Array.contains("I")
 
     let feeds =
         [

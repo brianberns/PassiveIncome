@@ -33,8 +33,12 @@ module Agent =
             ChatClient = chatClient
         }
 
-    let getResponseAsync<'t> agent (prompt : string) =
-        ChatClientStructuredOutputExtensions
-            .GetResponseAsync<'t>(
-                agent.ChatClient,
-                prompt)
+    let getResultAsync<'t> agent (prompt : string) =
+        task {
+            let! response =
+                ChatClientStructuredOutputExtensions
+                    .GetResponseAsync<'t>(
+                        agent.ChatClient,
+                        prompt)
+            return response.Result
+        } |> Async.AwaitTask

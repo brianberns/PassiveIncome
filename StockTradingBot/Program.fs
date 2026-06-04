@@ -79,9 +79,11 @@ module Program =
                         let hours = Math.Round(age.TotalHours, 1).ToString("F1")
                         $"Publication age: {hours} hours"
                 ]
-            let! response =
-                Agent.getResponseAsync<MarketOverview> agent prompt
-            printfn "%A" response.Result
+            let! overview =
+                Agent.getResultAsync<MarketOverview> agent prompt
+            printfn $"Trend: {overview.Trend}"
+            for candidate in overview.Candidates do
+                printfn $"{candidate.Symbol}: {candidate.Reason}"
         }
             |> Async.AwaitTask
             |> Async.RunSynchronously
