@@ -74,11 +74,11 @@ module Agent =
         } |> Async.AwaitTask
 
     let getMarketOverviewAsync httpClient agent =
-        task {
+        async {
                 // fetch news items
             let! results =
                 NewsFeed.feeds
-                    |> Seq.map (NewsFeed.getItems httpClient)
+                    |> Seq.map (NewsFeed.getItemsAsync httpClient)
                     |> Async.Parallel
             let items, errors =
                 results
@@ -86,10 +86,7 @@ module Agent =
                         | Ok items -> Choice1Of2 items
                         | Error error -> Choice2Of2 error)
 
-                // log errors
-            for feed, ex in errors do
-                printfn $"Error in {feed.Name} news feed: {ex.Message}"
-
+                // get market overview
             let prompt =
                 let utcNow = DateTime.UtcNow
                 let oneDay = TimeSpan.FromDays(1)
@@ -100,5 +97,10 @@ module Agent =
                         utcNow - item.PublishDate.UtcDateTime < oneDay)
                     |> Seq.sortByDescending _.PublishDate
                     |> getOverviewPrompt utcNow
-            return! getResultAsync<MarketOverview> prompt agent
-        } |> Async.AwaitTask
+            try
+                let! overview =
+                    getResultAsync<MarketOverview> prompt agent
+                return Ok overview, errors
+            with exn ->
+                return Error exn, errors
+        }

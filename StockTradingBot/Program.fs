@@ -1,6 +1,5 @@
 ﻿namespace StockTradingBot
 
-open System
 open System.Net.Http
 open System.Reflection
 
@@ -27,14 +26,20 @@ module Program =
                     .Build()
             Agent.create config
 
-        task {
-            let! overview =
+        async {
+            let! result, feedErrors =
                 Agent.getMarketOverviewAsync httpClient agent
-            printfn $"Trend: {overview.Trend}"
-            for candidate in overview.Candidates do
-                printfn $"{candidate.Symbol}: {candidate.Reason}"
-        }
-            |> Async.AwaitTask
-            |> Async.RunSynchronously
+
+            for feed, exn in feedErrors do
+                printfn $"Error in {feed.Name} news feed: {exn.Message}"
+
+            match result with
+                | Ok overview ->
+                    printfn $"Trend: {overview.Trend}"
+                    for candidate in overview.Candidates do
+                        printfn $"{candidate.Symbol}: {candidate.Reason}"
+                | Error exn ->
+                    printfn $"{exn.Message}"
+        } |> Async.RunSynchronously
 
     run ()

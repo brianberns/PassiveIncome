@@ -36,21 +36,21 @@ module NewsFeed =
             Filters = filters
         }
 
-    let getItems (httpClient : HttpClient) newsFeed =
+    let getItemsAsync (httpClient : HttpClient) newsFeed =
         task {
             try
                 let! rssXml = httpClient.GetStringAsync(newsFeed.Url)
                 use stringReader = new StringReader(rssXml)
                 use xmlReader = XmlReader.Create(stringReader)
                 let feed = SyndicationFeed.Load(xmlReader)
-                return Ok [
+                return Ok [|
                     for item in feed.Items do
                         if NewsItemFilter.applyFilters newsFeed.Filters item then
                             item.SourceFeed <- feed   // ick
                             item
-                ]
-            with ex ->
-                return Error (newsFeed, ex)
+                |]
+            with exn ->
+                return Error (newsFeed, exn)
         } |> Async.AwaitTask
 
     let private isPersonal : NewsItemFilter =
