@@ -2,7 +2,9 @@
 
 open System
 open System.Net.Http
+open System.Reflection
 
+open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
 
 module Program =
@@ -49,12 +51,25 @@ module Program =
             printfn $"{DateTime.UtcNow - item.PublishDate.UtcDateTime}"
 
     let test () =
+
         let config =
-            let assembly = typeof<NewsFeed>.Assembly
+            let assembly = Assembly.GetExecutingAssembly()
             ConfigurationBuilder()
-                .AddUserSecrets(assembly, true)
+                .AddUserSecrets(assembly)
                 .Build()
-        printfn "%s" config["Gemini:ApiKey"]
+
+        use googleClient =
+            new Google.GenAI.Client(
+                apiKey = config["Gemini:ApiKey"])
+        let chatClient = googleClient.AsIChatClient("gemini-2.5-flash")
+        task {
+            let! response =
+                chatClient.GetResponseAsync(
+                    "Explain F# pattern matching in two sentences.")
+            printfn "%s" response.Text
+        }
+            |> Async.AwaitTask
+            |> Async.RunSynchronously
 
     // run ()
     test ()
