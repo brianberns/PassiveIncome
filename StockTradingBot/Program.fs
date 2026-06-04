@@ -66,21 +66,22 @@ module Program =
         task {
             let prompt =
                 String.concat "\n" [
-                    "As a stock trader, scan the given news items for timely ideas. \
+                    "As a stock trader, scan the news items below for timely ideas. \
                     Identify a) the broad market/sector trend they collectively suggest, \
                     and b) the specific US stock symbols that are most directly affected \
-                    and worth a closer look."
+                    and worth a closer look. Return ONLY ticker symbols (not company names) \
+                    for liquid US equities."
                     for item in items do
                         ""
                         $"Title: {item.Title.Text}"
                         $"Summary: {item.Summary.Text}"
                         let age = DateTime.UtcNow - item.PublishDate.UtcDateTime
-                        $"Publication age: {age.TotalHours} hours"
+                        let hours = Math.Round(age.TotalHours, 1).ToString("F1")
+                        $"Publication age: {hours} hours"
                 ]
-            printfn ""
-            printfn "%s" prompt
-            // let! response = Agent.getResponseAsync agent prompt
-            // printfn "%s" response.Text
+            let! response =
+                Agent.getResponseAsync<MarketOverview> agent prompt
+            printfn "%A" response.Result
         }
             |> Async.AwaitTask
             |> Async.RunSynchronously
