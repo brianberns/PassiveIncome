@@ -18,6 +18,11 @@ type MarketOverview =
         Candidates : Candidate[]
     }
 
+type MarketOverviewResult =
+    | Overview of MarketOverview
+    | FeedErrors of (NewsFeed * exn)[]
+    | ChatError of exn
+
 type Agent =
     {
         GoogleClient : Google.GenAI.Client
@@ -80,27 +85,31 @@ module Agent =
                 NewsFeed.feeds
                     |> Seq.map (NewsFeed.getItemsAsync httpClient)
                     |> Async.Parallel
+
+                // handle errors
             let items, errors =
                 results
                     |> Array.partitionWith (function
                         | Ok items -> Choice1Of2 items
                         | Error error -> Choice2Of2 error)
-
-                // get market overview
-            let prompt =
-                let utcNow = DateTime.UtcNow
-                let oneDay = TimeSpan.FromDays(1)
-                items
-                    |> Seq.concat
-                    |> Seq.distinctBy _.Id
-                    |> Seq.where (fun item ->
-                        utcNow - item.PublishDate.UtcDateTime < oneDay)
-                    |> Seq.sortByDescending _.PublishDate
-                    |> getOverviewPrompt utcNow
-            try
-                let! overview =
-                    getResultAsync<MarketOverview> prompt agent
-                return Ok overview, errors
-            with exn ->
-                return Error exn, errors
+            if errors.Length > 0 then
+                return FeedErrors errors
+            else
+                    // get market overview
+                let prompt =
+                    let utcNow = DateTime.UtcNow
+                    let oneDay = TimeSpan.FromDays(1)
+                    items
+                        |> Seq.concat
+                        |> Seq.distinctBy _.Id
+                        |> Seq.where (fun item ->
+                            utcNow - item.PublishDate.UtcDateTime < oneDay)
+                        |> Seq.sortByDescending _.PublishDate
+                        |> getOverviewPrompt utcNow
+                try
+                    let! overview =
+                        getResultAsync<MarketOverview> prompt agent
+                    return Overview overview
+                with exn ->
+                    return ChatError exn
         }

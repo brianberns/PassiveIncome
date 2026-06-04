@@ -27,18 +27,15 @@ module Program =
             Agent.create config
 
         async {
-            let! result, feedErrors =
-                Agent.getMarketOverviewAsync httpClient agent
-
-            for feed, exn in feedErrors do
-                printfn $"Error in {feed.Name} news feed: {exn.Message}"
-
-            match result with
-                | Ok overview ->
+            match! Agent.getMarketOverviewAsync httpClient agent with
+                | Overview overview ->
                     printfn $"Trend: {overview.Trend}"
                     for candidate in overview.Candidates do
                         printfn $"{candidate.Symbol}: {candidate.Reason}"
-                | Error exn ->
+                | FeedErrors errors ->
+                    for feed, exn in errors do
+                        printfn $"Error in {feed.Name} news feed: {exn.Message}"
+                | ChatError exn ->
                     printfn $"{exn.Message}"
         } |> Async.RunSynchronously
 
