@@ -59,8 +59,8 @@ module Agent =
                 $"Summary: {item.Summary.Text}"
                 let hours =
                     let age = utcNow - item.PublishDate.UtcDateTime
-                    Math.Round(age.TotalHours, 1).ToString("F1")
-                $"Publication age: {hours} hours"
+                    Math.Round(age.TotalHours, 1)
+                $"Publication age: %.1f{hours} hours"
         ]
 
     let private getResultAsync<'t> (prompt : string) agent =
