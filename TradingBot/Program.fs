@@ -157,6 +157,24 @@ let private runAssetLookup (cfg : AppSettings) (symbol : string) =
                 eprintfn "    inner: %s" ex.InnerException.Message
     }
 
+let private runBars (cfg : AppSettings) (symbol : string) =
+    task {
+        let _, data = makeAlpacaClients cfg
+        let prices  = Prices.create data
+        let sym = Asset (symbol.Trim().ToUpperInvariant())
+        printfn "Fetching daily bars for %s (SIP feed)..." (Asset.value sym)
+        try
+            let! r = prices.FetchOne sym
+            match r with
+            | None -> printfn "  No bars returned."
+            | Some (snap, addv) ->
+                printfn "  Last daily close: $%.4f" (Usd.value snap.PriceUsd)
+                printfn "  Change 1d: %+.2f%%   5d: %+.2f%%" snap.Change24hPct snap.Change7dPct
+                printfn "  Avg daily $ volume (ADDV): $%s" (addv.ToString("N0"))
+        with ex ->
+            eprintfn "  Bars FAILED: %s: %s" (ex.GetType().Name) ex.Message
+    }
+
 let private runProbe (cfg : AppSettings) =
     task {
         use http = newHttpClient ()
@@ -288,6 +306,9 @@ let main argv =
         | [| "--asset"; sym |] ->
             (runAssetLookup cfg sym).GetAwaiter().GetResult()
             0
+        | [| "--bars"; sym |] ->
+            (runBars cfg sym).GetAwaiter().GetResult()
+            0
         | [| "--decisions" |] ->
             runDecisions cfg 3
             0
@@ -312,6 +333,7 @@ let main argv =
             eprintfn "  --once          run a single cycle and exit"
             eprintfn "  --report        portfolio with live mark-to-market P&L + recent trades"
             eprintfn "  --asset SYM     look up one ticker's Alpaca tradability metadata"
+            eprintfn "  --bars SYM      fetch one ticker's daily bars (price, change, ADDV)"
             eprintfn "  --decisions [n] print the last n LLM decision cycles (default 3)"
             1
     with ex ->

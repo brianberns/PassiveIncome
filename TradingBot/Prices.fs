@@ -24,10 +24,15 @@ module Prices =
 
         let fetchBars (symbol : string) =
             task {
-                let now      = DateTime.UtcNow
-                let lookback = now.AddDays(-12.0)   // ~8 trading sessions of headroom
-                let req = HistoricalBarsRequest(symbol, lookback, now, BarTimeFrame.Day)
-                req.Feed <- Nullable MarketDataFeed.Iex
+                // SIP (the consolidated all-exchange tape) is free as long as the
+                // end time is >= 15 min ago; we hold back 16 min for margin. At our
+                // daily-bar / hourly cadence the delay is irrelevant, and SIP gives
+                // accurate market-wide volume — IEX would report only its single
+                // venue's slice, understating ADDV (which drives the liquidity floor).
+                let endTime  = DateTime.UtcNow.AddMinutes(-16.0)
+                let lookback = endTime.AddDays(-12.0)   // ~8 trading sessions of headroom
+                let req = HistoricalBarsRequest(symbol, lookback, endTime, BarTimeFrame.Day)
+                req.Feed <- Nullable MarketDataFeed.Sip
                 let! page = dataClient.ListHistoricalBarsAsync(req)
                 return page.Items |> Seq.toArray
             }
