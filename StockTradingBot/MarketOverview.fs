@@ -81,19 +81,19 @@ module MarketOverview =
                 $"Publication age: %.1f{hours} hours"
         ]
 
-    type private CandidateDto =
+    type CandidateDto =
         {
             Symbol : string
             Reason : string
         }
 
-    type private MarketOverviewDto =
+    type MarketOverviewDto =
         {
             Trend : string
             Candidates : CandidateDto[]
         }
 
-    let private ofDto overviewDto =
+    let ofDto overviewDto =
         overviewDto.Candidates
             |> Array.map (fun candDto ->
                 Candidate.create
