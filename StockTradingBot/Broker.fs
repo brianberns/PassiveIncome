@@ -1,66 +1,88 @@
 namespace StockTradingBot
 
-open System
 open Microsoft.Extensions.Configuration
 open Alpaca.Markets
 
+/// Money, cash, moola...
 [<StructuredFormatDisplay("{String}")>]
 type Money =
+
+    /// U.S. dollars ($).
     | Usd of decimal
 
+    /// Display string.
     member money.String =
         let (Usd usd) = money
         $"${usd}"
 
+    /// Display string.
     override money.ToString() =
         money.String
 
+/// An investment asset, such as stock in a company.
 type Asset =
     {
+        /// Asset symbol. E.g. Apple = "AAPL".
         Symbol : string
     }
 
 module Asset =
 
+    /// Creates an asset.
     let create symbol =
         { Symbol = symbol }
 
+/// Value of an asset in a portfolio.
 type AssetValue =
     {
+        /// Amount of asset in the portfolio.
         Quantity : decimal
+
+        /// Average entry price of the asset in the portfolio.
         AverageEntryPrice : Money
     }
 
 module AssetValue =
 
+    /// Creates an asset value.
     let create quantity averageEntryPrice =
         {
             Quantity = quantity
             AverageEntryPrice = averageEntryPrice
         }
 
+/// An investment portfolio.
 type Portfolio =
     {
+        /// Tradable cash in the portfolio.
         TradableCash : Money
+
+        /// Assets in the portfolio.
         PositionMap : Map<Asset, AssetValue>
     }
 
 module Portfolio =
 
+    /// Creates a portfolio.
     let create tradableCash positionMap =
         {
             TradableCash = tradableCash
             PositionMap = positionMap
         }
 
+/// Broker for buying/selling assets.
 type Broker =
     {
+        /// Data client.
         DataClient : IAlpacaDataClient
+
+        /// Trading client.
         TradingClient : IAlpacaTradingClient
     }
 
 module Broker =
 
+    /// Creates a broker.
     let create (config : IConfiguration) =
         let key =
             let keyId = config["Alpaca:KeyId"]
@@ -72,6 +94,7 @@ module Broker =
             TradingClient = env.GetAlpacaTradingClient(key)
         }
 
+    /// Gets the current portfolio at the given broker.
     let getPortfolio broker =
         task {
             try
@@ -98,26 +121,12 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
+    /// Is the given broker's market currently open?
     let isMarketOpen broker =
         task {
             try
                 let! clock = broker.TradingClient.GetClockAsync()
                 return Ok clock.IsOpen
-            with exn ->
-                return Error exn
-        } |> Async.AwaitTask
-
-    let getBars asset broker =
-        task {
-            try
-                let! page =
-                    let utcNow = DateTime.UtcNow
-                    let dtStart = utcNow - TimeSpan.FromDays(14)
-                    let dtEnd = utcNow - TimeSpan.FromMinutes(15.1)   // most recent bars not available for free
-                    HistoricalBarsRequest(
-                        asset.Symbol, dtStart, dtEnd, BarTimeFrame.Day)
-                        |> broker.DataClient.ListHistoricalBarsAsync
-                return Ok (Seq.toArray page.Items)   // assume one page of results is sufficent
             with exn ->
                 return Error exn
         } |> Async.AwaitTask
