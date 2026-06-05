@@ -72,8 +72,8 @@ module AssetRecommendation =
             return candidate, result
         }
 
-    /// Asset recommendation DTO. (Sadly, has to be public for serialization.)
-    type AssetRecommendationDto =
+    /// Asset recommendation DTO.
+    type (*private*) AssetRecommendationDto =
         {
             Symbol : string
             Action : AssetAction

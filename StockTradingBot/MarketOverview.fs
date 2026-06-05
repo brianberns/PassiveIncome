@@ -97,7 +97,7 @@ module MarketOverview =
         ]
 
     /// Candidate DTO. (Sadly, has to be public for serialization.)
-    type CandidateDto =
+    type (*private*) CandidateDto =
         {
             /// Candidate asset symbol.
             Symbol : string
@@ -106,8 +106,8 @@ module MarketOverview =
             Reason : string
         }
 
-    /// Market overview DTO. (Sadly, has to be public for serialization.)
-    type MarketOverviewDto =
+    /// Market overview DTO.
+    type (*private*) MarketOverviewDto =
         {
             /// Overall market trend.
             Trend : string
