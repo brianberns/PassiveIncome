@@ -58,14 +58,14 @@ module AssetInvestigation =
             return candidate, result
         }
 
-    type AssetInvestigationDto =
+    type private AssetInvestigationDto =
         {
             Symbol : string
             Action : AssetAction
             Reason : string
         }
 
-    let ofDto dto =
+    let private ofDto dto =
         create
             (Asset.create dto.Symbol)
             dto.Action

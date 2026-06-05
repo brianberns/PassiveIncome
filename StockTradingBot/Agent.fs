@@ -1,6 +1,9 @@
 namespace StockTradingBot
 
 open System
+open System.Text.Json
+open System.Text.Json.Serialization
+open System.Text.Json.Serialization.Metadata
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
@@ -33,14 +36,21 @@ module Agent =
             ChatClient = chatClient
         }
 
+    // https://gemini.google.com/app/655a2dc4f288270c
+    let private options =
+        let options =
+            JsonSerializerOptions(
+                TypeInfoResolver = DefaultJsonTypeInfoResolver())
+        options.Converters.Add(JsonFSharpConverter())
+        options
+
     let getResultAsync<'t> (prompt : string) agent =
         task {
             try
                 let! response =
                     ChatClientStructuredOutputExtensions
                         .GetResponseAsync<'t>(
-                            agent.ChatClient,
-                            prompt)
+                            agent.ChatClient, prompt, options)
                 return Ok response.Result
             with exn ->
                 return Error exn
