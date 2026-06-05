@@ -34,8 +34,14 @@ type MarketOverview =
 
 /// Results possible when determining market overview.
 type MarketOverviewResult =
+
+    /// Agent succeeded.
     | Success of MarketOverview
+
+    /// News feed errors occurred prior to agent request.
     | FeedErrors of (NewsFeed * exn)[]
+
+    /// Agent request failed.
     | AgentError of exn
 
 module MarketOverview =

@@ -27,7 +27,7 @@ module Program =
 
         async {
             match! MarketOverview.getAsync httpClient agent with
-                | Success overview ->
+                | MarketOverviewResult.Success overview ->
                     printfn $"Trend: {overview.Trend}"
                     printfn ""
                     printfn "Candidates:"
@@ -35,20 +35,27 @@ module Program =
                         printfn ""
                         printfn $"{candidate.Asset.Symbol}"
                         printfn $"{candidate.Reason}"
-                    match! AssetRecommendation.getAsync httpClient agent overview with
-                        | Ok recos ->
+
+                    let! result =
+                        AssetRecommendation.getAsync httpClient agent overview
+                    match result with
+                        | AssetRecommendationResult.Success results ->
                             printfn ""
                             printfn "Recommendations:"
-                            for reco in recos do
+                            for result in results do
                                 printfn ""
-                                printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                                printfn $"{reco.Reason}"
-                        | Error exn ->
+                                match result with
+                                    | Ok reco ->
+                                        printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                                        printfn $"{reco.Reason}"
+                                    | Error (asset, exn) ->
+                                        printfn $"Asset error: {asset}: {exn.Message}"
+                        | AssetRecommendationResult.AgentError exn ->
                             printfn $"Asset recommendation error: {exn.Message}"
                 | FeedErrors errors ->
                     for feed, exn in errors do
                         printfn $"News feed error: {feed.Name}: {exn.Message}"
-                | AgentError exn ->
+                | MarketOverviewResult.AgentError exn ->
                     printfn $"Market overview error: {exn.Message}"
         } |> Async.RunSynchronously
 

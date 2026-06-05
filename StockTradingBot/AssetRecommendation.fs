@@ -22,6 +22,14 @@ type AssetRecommendation =
         Reason : string
     }
 
+type AssetRecommendationResult =
+
+    /// Agent succeeded, but some assets might have a problem.
+    | Success of Result<AssetRecommendation, (Asset * exn)>[]
+
+    /// Agent request failed.
+    | AgentError of exn
+
 module AssetRecommendation =
 
     /// Creates an asset recommendation.
@@ -89,7 +97,7 @@ module AssetRecommendation =
 
     /// Determines asset recommendations from the given market
     /// overview.
-    let getAsync httpClient agent marketOverview =
+    let getAsync httpClient agent marketOverview : Async<AssetRecommendationResult> =
         async {
                 // fetch news items
             let! candResults =
@@ -110,9 +118,24 @@ module AssetRecommendation =
 
             let utcNow = DateTime.UtcNow
             let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
-            match! Agent.getResultAsync<AssetRecommendationDto[]> prompt agent with
+            let! dtosResult =
+                Agent.getResultAsync<AssetRecommendationDto[]> prompt agent
+            match dtosResult with
                 | Ok dtos ->
-                    return Ok (Array.map ofDto dtos)
+                    let recoMap =
+                        dtos
+                            |> Seq.map (fun dto ->
+                                let reco = ofDto dto
+                                reco.Asset, reco)
+                            |> Map
+                    return Success [|
+                        for cand in marketOverview.Candidates do
+                            match Map.tryFind cand.Asset recoMap with
+                                | Some reco -> Ok reco
+                                | None ->
+                                    Error (cand.Asset, exn("Agent ignored"))
+                    |]
+
                 | Error exn ->
-                    return Error exn
+                    return AgentError exn
         }
