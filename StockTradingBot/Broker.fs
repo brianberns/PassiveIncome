@@ -105,7 +105,7 @@ module Broker =
                 let! page =
                     let utcNow = DateTime.UtcNow
                     let dtStart = utcNow - TimeSpan.FromDays(14)
-                    let dtEnd = utcNow - TimeSpan.FromMinutes(15.0)   // most recent bars not available for free
+                    let dtEnd = utcNow - TimeSpan.FromMinutes(15.1)   // most recent bars not available for free
                     HistoricalBarsRequest(
                         symbol, dtStart, dtEnd, BarTimeFrame.Day)
                         |> broker.DataClient.ListHistoricalBarsAsync
