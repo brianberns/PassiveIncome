@@ -7,6 +7,12 @@ open Microsoft.Extensions.Configuration
 
 module Program =
 
+    let config =
+        let assembly = Assembly.GetExecutingAssembly()
+        ConfigurationBuilder()
+            .AddUserSecrets(assembly)
+            .Build()
+
     let run () =
 
             // create HTTP client
@@ -18,13 +24,7 @@ module Program =
             client
 
             // create agent
-        use agent =
-            let config =
-                let assembly = Assembly.GetExecutingAssembly()
-                ConfigurationBuilder()
-                    .AddUserSecrets(assembly)
-                    .Build()
-            Agent.create config
+        use agent = Agent.create config
 
         async {
             match! Agent.getMarketOverviewAsync httpClient agent with
@@ -39,4 +39,8 @@ module Program =
                     printfn $"{exn.Message}"
         } |> Async.RunSynchronously
 
-    run ()
+    let test () =
+        printfn "%A" (Broker.create config)
+
+    // run ()
+    test ()

@@ -8,11 +8,13 @@
 
   <ItemGroup>
     <Compile Include="NewsFeed.fs" />
+    <Compile Include="Broker.fs" />
     <Compile Include="Agent.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Alpaca.Markets" Version="7.2.0" />
     <PackageReference Include="Google.GenAI" Version="1.9.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
