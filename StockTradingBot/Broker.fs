@@ -86,3 +86,9 @@ module Broker =
 
             return Portfolio.create cash positionMap
         } |> Async.AwaitTask
+
+    let isMarketOpen broker =
+        task {
+            let! clock = broker.TradingClient.GetClockAsync()
+            return clock.IsOpen
+        } |> Async.AwaitTask

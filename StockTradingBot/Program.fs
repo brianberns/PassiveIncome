@@ -44,6 +44,8 @@ module Program =
         async {
             let! portfolio = Broker.getPortfolio broker
             printfn "%A" portfolio
+            let! isOpen = Broker.isMarketOpen broker
+            printfn "%A" isOpen
         } |> Async.RunSynchronously
 
     // run ()
