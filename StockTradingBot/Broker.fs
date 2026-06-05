@@ -66,29 +66,35 @@ module Broker =
 
     let getPortfolio broker =
         task {
-                // get available cash
-            let! account = broker.TradingClient.GetAccountAsync()
-            let cash = Usd account.TradableCash
+            try
+                    // get available cash
+                let! account = broker.TradingClient.GetAccountAsync()
+                let cash = Usd account.TradableCash
 
-                // get positions
-            let! positions =
-                broker.TradingClient.ListPositionsAsync()
-            let positionMap =
-                Map [
-                    for position in positions do
-                        let asset = Symbol position.Symbol
-                        let value =
-                            AssetValue.create
-                                position.Quantity
-                                (Usd position.AverageEntryPrice)
-                        asset, value
-                ]
+                    // get positions
+                let! positions =
+                    broker.TradingClient.ListPositionsAsync()
+                let positionMap =
+                    Map [
+                        for position in positions do
+                            let asset = Symbol position.Symbol
+                            let value =
+                                AssetValue.create
+                                    position.Quantity
+                                    (Usd position.AverageEntryPrice)
+                            asset, value
+                    ]
 
-            return Portfolio.create cash positionMap
+                return Ok (Portfolio.create cash positionMap)
+            with exn ->
+                return Error exn
         } |> Async.AwaitTask
 
     let isMarketOpen broker =
         task {
-            let! clock = broker.TradingClient.GetClockAsync()
-            return clock.IsOpen
+            try
+                let! clock = broker.TradingClient.GetClockAsync()
+                return Ok clock.IsOpen
+            with exn ->
+                return Error exn
         } |> Async.AwaitTask

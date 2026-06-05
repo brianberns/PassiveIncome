@@ -70,12 +70,15 @@ module Agent =
 
     let private getResultAsync<'t> (prompt : string) agent =
         task {
-            let! response =
-                ChatClientStructuredOutputExtensions
-                    .GetResponseAsync<'t>(
-                        agent.ChatClient,
-                        prompt)
-            return response.Result
+            try
+                let! response =
+                    ChatClientStructuredOutputExtensions
+                        .GetResponseAsync<'t>(
+                            agent.ChatClient,
+                            prompt)
+                return Ok response.Result
+            with exn ->
+                return Error exn
         } |> Async.AwaitTask
 
     let getMarketOverviewAsync httpClient agent =
@@ -106,10 +109,7 @@ module Agent =
                             utcNow - item.PublishDate.UtcDateTime < oneDay)
                         |> Seq.sortByDescending _.PublishDate
                         |> getOverviewPrompt utcNow
-                try
-                    let! overview =
-                        getResultAsync<MarketOverview> prompt agent
-                    return Overview overview
-                with exn ->
-                    return ChatError exn
+                match! getResultAsync<MarketOverview> prompt agent with
+                    | Ok overview -> return Overview overview
+                    | Error exn ->  return ChatError exn
         }
