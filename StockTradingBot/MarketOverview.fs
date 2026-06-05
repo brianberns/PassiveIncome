@@ -54,30 +54,6 @@ module MarketOverview =
             item.Title.Text.Split([| ' '; ''' |])   // isolate "I" from "I'm"
                 |> Array.contains("I")
 
-    /// General market news feeds.
-    let private feeds =
-        [
-            NewsFeed.create
-                "MarketWatch Top Stories"
-                "https://feeds.content.dowjones.io/public/rss/mw_topstories"
-                [
-                    NewsItemFilter.hasSummary
-                    (isPersonal >> not)   // filter out personal finance stories
-                ]
-            NewsFeed.create
-                "CNBC Top News"
-                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
-                [ NewsItemFilter.hasSummary ]
-            NewsFeed.create
-                "CNBC Finance"
-                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
-                [ NewsItemFilter.hasSummary ]
-            NewsFeed.create
-                "Yahoo S&P 500"
-                "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"   // ^GSPC = S&P 500
-                [ NewsItemFilter.hasSummary ]
-        ]
-
     /// Creates a prompt for the given news items.
     let private getPrompt utcNow items =
         String.concat "\n" [
@@ -125,39 +101,78 @@ module MarketOverview =
                     candDto.Reason)
             |> create overviewDto.Trend
 
-    /// Determines the current market overview:
-    ///    1. Fetch general news items from feeds.
-    ///    2. Asks agent to identify overall market trend and
-    ///       candidate assets from those news items.
-    let getAsync httpClient agent =
+    /// General market news feeds.
+    let private feeds =
+        [
+            NewsFeed.create
+                "MarketWatch Top Stories"
+                "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+                [
+                    NewsItemFilter.hasSummary
+                    (isPersonal >> not)   // filter out personal finance stories
+                ]
+            NewsFeed.create
+                "CNBC Top News"
+                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+                [ NewsItemFilter.hasSummary ]
+            NewsFeed.create
+                "CNBC Finance"
+                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
+                [ NewsItemFilter.hasSummary ]
+            NewsFeed.create
+                "Yahoo S&P 500"
+                "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"   // ^GSPC = S&P 500
+                [ NewsItemFilter.hasSummary ]
+        ]
+
+    /// Gets items from the given news feeds.
+    let private getNewsItems httpClient feeds =
         async {
-                // fetch news items
+                // fetch news items from feeds
             let! results =
                 feeds
                     |> Seq.map (NewsFeed.getItemsAsync httpClient)
                     |> Async.Parallel
 
                 // handle errors
-            let itemArrays, errors =
-                results
-                    |> Array.partitionWith (function
-                        | Ok items -> Choice1Of2 items
-                        | Error error -> Choice2Of2 error)
-            if errors.Length > 0 then
+            return results
+                |> Array.partitionWith (function
+                    | Ok items -> Choice1Of2 items
+                    | Error error -> Choice2Of2 error)
+        }
+
+    /// Determines market overview from the given news items.
+    let private getOverview itemArrays agent =
+        async {
+            let prompt =
+                let utcNow = DateTime.UtcNow
+                let oneDay = TimeSpan.FromDays(1)
+                itemArrays
+                    |> Seq.concat
+                    |> Seq.distinctBy (fun (item : SyndicationItem) ->
+                        item.Id)
+                    |> Seq.where (fun item ->
+                        utcNow - item.PublishDate.UtcDateTime < oneDay)
+                    |> Seq.sortByDescending _.PublishDate
+                    |> getPrompt utcNow
+            match! Agent.getResultAsync<MarketOverviewDto> prompt agent with
+                | Ok dto -> return Success (ofDto dto)
+                | Error exn ->  return AgentError exn
+        }
+
+    /// Determines the current market overview:
+    ///    1. Fetch general news items from feeds.
+    ///    2. Asks agent to identify overall market trend and
+    ///       candidate assets from those news items.
+    let getAsync httpClient agent =
+        async {
+                // get news items
+            let! itemArrays, errors =
+                getNewsItems httpClient feeds
+
+                // get overview?
+            if errors.Length > 0 then   // to-do: carry on (with limited information) if any of the feeds fail?
                 return FeedErrors errors
             else
-                    // use news items to get market overview
-                let prompt =
-                    let utcNow = DateTime.UtcNow
-                    let oneDay = TimeSpan.FromDays(1)
-                    itemArrays
-                        |> Seq.concat
-                        |> Seq.distinctBy _.Id
-                        |> Seq.where (fun item ->
-                            utcNow - item.PublishDate.UtcDateTime < oneDay)
-                        |> Seq.sortByDescending _.PublishDate
-                        |> getPrompt utcNow
-                match! Agent.getResultAsync<MarketOverviewDto> prompt agent with
-                    | Ok dto -> return Success (ofDto dto)
-                    | Error exn ->  return AgentError exn
+                return! getOverview itemArrays agent
         }
