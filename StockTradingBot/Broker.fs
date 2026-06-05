@@ -1,7 +1,7 @@
 namespace StockTradingBot
 
+open System
 open Microsoft.Extensions.Configuration
-
 open Alpaca.Markets
 
 [<StructuredFormatDisplay("{String}")>]
@@ -95,6 +95,21 @@ module Broker =
             try
                 let! clock = broker.TradingClient.GetClockAsync()
                 return Ok clock.IsOpen
+            with exn ->
+                return Error exn
+        } |> Async.AwaitTask
+
+    let fetchBars (Symbol symbol) broker =
+        task {
+            try
+                let! page =
+                    let utcNow = DateTime.UtcNow
+                    let lookback = utcNow - TimeSpan.FromDays(14)
+                    HistoricalBarsRequest(
+                        symbol, lookback, utcNow, BarTimeFrame.Day,
+                        Feed = MarketDataFeed.Iex)   // only feed available for free
+                        |> broker.DataClient.ListHistoricalBarsAsync
+                return Ok (Seq.toArray page.Items)   // assume one page of results is sufficent
             with exn ->
                 return Error exn
         } |> Async.AwaitTask
