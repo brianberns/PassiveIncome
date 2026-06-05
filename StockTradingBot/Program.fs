@@ -32,12 +32,17 @@ module Program =
                     printfn ""
                     printfn "Candidates:"
                     for candidate in overview.Candidates do
-                        printfn $"   {candidate.Asset.Symbol}: {candidate.Reason}"
+                        printfn ""
+                        printfn $"{candidate.Asset.Symbol}"
+                        printfn $"{candidate.Reason}"
                     match! AssetInvestigation.getAsync httpClient agent overview with
                         | Ok invs ->
                             printfn ""
+                            printfn "Decisions:"
                             for inv in invs do
-                                printfn $"{inv.Asset.Symbol} {inv.Action}: {inv.Reason}"
+                                printfn ""
+                                printfn $"{inv.Asset.Symbol}: {inv.Action}"
+                                printfn $"{inv.Reason}"
                         | Error exn ->
                             printfn $"Asset investigation error: {exn.Message}"
                 | FeedErrors errors ->

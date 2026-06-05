@@ -3,7 +3,10 @@ namespace StockTradingBot
 open System
 open System.ServiceModel.Syndication
 
-type AssetAction = Buy | Sell | Hold
+type AssetAction =
+    | Buy = 0   // must be a .NET enum for serialization
+    | Sell = 1
+    | Hold = 2
 
 type AssetInvestigation =
     {
