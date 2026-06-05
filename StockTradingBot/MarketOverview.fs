@@ -53,10 +53,10 @@ module MarketOverview =
     let private getPrompt utcNow items =
         String.concat "\n" [
             "As a stock trader, scan the news items below for timely ideas. \
-            Identify a) the broad market/sector trend they collectively suggest, \
-            and b) the specific US stock symbols that are most directly affected \
-            and worth a closer look. Return ONLY ticker symbols (not company names) \
-            for liquid US equities."
+            Identify a) the broad market/sector trend they collectively \
+            suggest, and b) the specific US stock symbols that are most \
+            directly affected and worth a closer look. Return ONLY ticker \
+            symbols (not company names) for liquid US equities."
             for (item : SyndicationItem) in items do
                 ""
                 $"Title: {item.Title.Text}"
@@ -76,7 +76,7 @@ module MarketOverview =
                     |> Async.Parallel
 
                 // handle errors
-            let items, errors =
+            let itemArrays, errors =
                 results
                     |> Array.partitionWith (function
                         | Ok items -> Choice1Of2 items
@@ -88,7 +88,7 @@ module MarketOverview =
                 let prompt =
                     let utcNow = DateTime.UtcNow
                     let oneDay = TimeSpan.FromDays(1)
-                    items
+                    itemArrays
                         |> Seq.concat
                         |> Seq.distinctBy _.Id
                         |> Seq.where (fun item ->

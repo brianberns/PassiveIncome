@@ -56,14 +56,8 @@ module Program =
         async {
             let! result =
                 AssetInvestigation.getAsync
-                    httpClient agent (Symbol "AAPL")
-            match result with
-                | Ok items ->
-                    for item in items do
-                        printfn ""
-                        printfn "%s" item.Title.Text
-                        printfn "%s" item.Summary.Text
-                | Error error -> printfn "%A" error
+                    httpClient agent [Symbol "AAPL"; Symbol "MRVL"]
+            printfn "%A" result
         } |> Async.RunSynchronously
 
     Console.OutputEncoding <- Text.Encoding.UTF8
