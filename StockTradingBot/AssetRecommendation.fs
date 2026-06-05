@@ -80,6 +80,22 @@ module AssetRecommendation =
             return candidate, result
         }
 
+    /// Gets news items for the given candidate assets.
+    let getNewsItems httpClient candidates =
+        async {
+            let! results =
+                candidates
+                    |> Seq.map (getCandidateNewsItems httpClient)
+                    |> Async.Parallel
+
+                // handle errors
+            return results
+                |> Array.partitionWith (fun (cand, result) ->
+                    match result with
+                        | Ok items -> Choice1Of2 (cand, items)
+                        | Error error -> Choice2Of2 (cand, error))
+        }
+
     /// Asset recommendation DTO.
     type (*private*) AssetRecommendationDto =
         {
@@ -95,27 +111,8 @@ module AssetRecommendation =
             dto.Action
             dto.Reason
 
-    /// Determines asset recommendations from the given market
-    /// overview.
-    let getAsync httpClient agent marketOverview : Async<AssetRecommendationResult> =
+    let private getRecommendations agent marketOverview candItemArrays =
         async {
-                // fetch news items
-            let! candResults =
-                marketOverview.Candidates
-                    |> Seq.map (getCandidateNewsItems httpClient)
-                    |> Async.Parallel
-
-                // handle errors
-            let candItemArrays, candErrors =
-                candResults
-                    |> Array.partitionWith (fun (cand, result) ->
-                        match result with
-                            | Ok items -> Choice1Of2 (cand, items)
-                            | Error error -> Choice2Of2 (cand, error))
-
-            for cand, (feed, exn) in candErrors do
-                printfn $"Asset recommendation error: {cand.Asset.Symbol}: {exn.Message}"
-
             let utcNow = DateTime.UtcNow
             let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
             let! dtosResult =
@@ -138,4 +135,21 @@ module AssetRecommendation =
 
                 | Error exn ->
                     return AgentError exn
+        }
+
+    /// Determines asset recommendations from the given market
+    /// overview:
+    ///    1. Fetches news items specific to the candidate assets.
+    ///    2. Asks agent to recommend an action for each asset.
+    let getAsync httpClient agent marketOverview : Async<AssetRecommendationResult> =
+        async {
+                // get news items
+            let! candItemArrays, candErrors =
+                getNewsItems httpClient marketOverview.Candidates
+
+            for cand, (feed, exn) in candErrors do
+                printfn $"Asset recommendation error: {cand.Asset.Symbol}: {exn.Message}"
+
+                // get recommendations
+            return! getRecommendations agent marketOverview candItemArrays
         }
