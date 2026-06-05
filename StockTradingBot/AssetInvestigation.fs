@@ -3,23 +3,43 @@ namespace StockTradingBot
 open System
 open System.ServiceModel.Syndication
 
+type AssetAction = Buy | Sell | Hold
+
+type AssetInvestigation =
+    {
+        Asset : Asset
+        Action : AssetAction
+        Reason : string
+    }
+
 module AssetInvestigation =
 
-    let private getFeed (Symbol symbol) =
+    let create asset action reason =
+        {
+            Asset = asset
+            Action = action
+            Reason = reason
+        }
+
+    let private getFeed asset =
         NewsFeed.create
-            $"Yahoo {symbol}"
-            $"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+            $"Yahoo {asset.Symbol}"
+            $"https://feeds.finance.yahoo.com/rss/2.0/headline?s={asset.Symbol}&region=US&lang=en-US"
             [ NewsItemFilter.hasSummary ]
 
-    let private getPrompt utcNow assetNews =
+    let private getPrompt utcNow marketTrend candidateNews =
         String.concat "\n" [
-            "As a stock trader, decide whether to Buy, Sell, or Hold each \
-            stock symbol listed below based on its news items."
-            for (Symbol symbol, items) in assetNews do
+            "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
+            each stock symbol listed below based on the its news items and \
+            the current overall market trend."
+            ""
+            $"Trend: %s{marketTrend}"
+            for (candidate : Candidate, items) in candidateNews do
                 ""
                 "###################"
                 ""
-                $"Asset: {symbol}"
+                $"Asset: {candidate.Asset.Symbol}"
+                $"Hunch: {candidate.Reason}"
                 for (item : SyndicationItem) in items do
                     ""
                     $"Title: {item.Title.Text}"
@@ -30,34 +50,51 @@ module AssetInvestigation =
                     $"Publication age: %.1f{hours} hours"
         ]
 
-    let private getAssetResult httpClient asset =
+    let private getCandidateResult httpClient (candidate : Candidate) =
         async {
             let! result =
-                getFeed asset
+                getFeed candidate.Asset
                     |> NewsFeed.getItemsAsync httpClient
-            return asset, result
+            return candidate, result
         }
 
-    let getAsync httpClient agent assets =
+    type private AssetInvestigationDto =
+        {
+            Symbol : string
+            Action : AssetAction
+            Reason : string
+        }
+
+    let private ofDto dto =
+        create
+            (Asset.create dto.Symbol)
+            dto.Action
+            dto.Reason
+
+    let getAsync httpClient agent marketOverview =
         async {
                 // fetch news items
-            let! assetResults =
-                assets
-                    |> Seq.map (getAssetResult httpClient)
+            let! candResults =
+                marketOverview.Candidates
+                    |> Seq.map (getCandidateResult httpClient)
                     |> Async.Parallel
 
                 // handle errors
-            let assetItemArrays, assetErrors =
-                assetResults
-                    |> Array.partitionWith (fun (asset, result) ->
+            let candItemArrays, candErrors =
+                candResults
+                    |> Array.partitionWith (fun (cand, result) ->
                         match result with
-                            | Ok items -> Choice1Of2 (asset, items)
-                            | Error error -> Choice2Of2 (asset, error))
+                            | Ok items -> Choice1Of2 (cand, items)
+                            | Error error -> Choice2Of2 (cand, error))
 
-            for (Symbol symbol), (feed, exn) in assetErrors do
-                printfn $"{symbol}: {exn.Message}"
+            for cand, (feed, exn) in candErrors do
+                printfn $"{cand.Asset.Symbol}: {exn.Message}"
 
             let utcNow = DateTime.UtcNow
-            let prompt = getPrompt utcNow assetItemArrays
-            return Ok prompt
+            let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
+            match! Agent.getResultAsync<AssetInvestigationDto[]> prompt agent with
+                | Ok dtos ->
+                    return Ok (Array.map ofDto dtos)
+                | Error exn ->
+                    return Error exn
         }

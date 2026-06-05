@@ -29,8 +29,17 @@ module Program =
             match! MarketOverview.getAsync httpClient agent with
                 | Overview overview ->
                     printfn $"Trend: {overview.Trend}"
+                    printfn ""
+                    printfn "Candidates:"
                     for candidate in overview.Candidates do
-                        printfn $"{candidate.Symbol}: {candidate.Reason}"
+                        printfn $"   {candidate.Asset.Symbol}: {candidate.Reason}"
+                    match! AssetInvestigation.getAsync httpClient agent overview with
+                        | Ok invs ->
+                            printfn ""
+                            for inv in invs do
+                                printfn $"{inv.Asset.Symbol} {inv.Action}: {inv.Reason}"
+                        | Error exn ->
+                            printfn $"{exn.Message}"
                 | FeedErrors errors ->
                     for feed, exn in errors do
                         printfn $"Error in {feed.Name} news feed: {exn.Message}"
@@ -45,21 +54,12 @@ module Program =
             printfn "%A" portfolio
             let! isOpen = Broker.isMarketOpen broker
             printfn "%A" isOpen
-            match! Broker.getBars (Symbol "AAPL") broker with
+            match! Broker.getBars (Asset.create "AAPL") broker with
                 | Ok bars ->
                     for bar in bars do
                         printfn "%A: %A - %A" (bar.TimeUtc.ToLocalTime()) (Usd bar.Open) (Usd bar.Close)
                 | Error exn -> printfn "%A" exn
         } |> Async.RunSynchronously
 
-    let test2() =
-        async {
-            let! result =
-                AssetInvestigation.getAsync
-                    httpClient agent [Symbol "AAPL"; Symbol "MRVL"]
-            printfn "%A" result
-        } |> Async.RunSynchronously
-
     Console.OutputEncoding <- Text.Encoding.UTF8
-    // run ()
-    test2 ()
+    run ()

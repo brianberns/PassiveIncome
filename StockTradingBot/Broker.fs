@@ -15,7 +15,15 @@ type Money =
     override money.ToString() =
         money.String
 
-type Asset = Symbol of string
+type Asset =
+    {
+        Symbol : string
+    }
+
+module Asset =
+
+    let create symbol =
+        { Symbol = symbol }
 
 type AssetValue =
     {
@@ -77,7 +85,7 @@ module Broker =
                 let positionMap =
                     Map [
                         for position in positions do
-                            let asset = Symbol position.Symbol
+                            let asset = Asset.create position.Symbol
                             let value =
                                 AssetValue.create
                                     position.Quantity
@@ -99,7 +107,7 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
-    let getBars (Symbol symbol) broker =
+    let getBars asset broker =
         task {
             try
                 let! page =
@@ -107,7 +115,7 @@ module Broker =
                     let dtStart = utcNow - TimeSpan.FromDays(14)
                     let dtEnd = utcNow - TimeSpan.FromMinutes(15.1)   // most recent bars not available for free
                     HistoricalBarsRequest(
-                        symbol, dtStart, dtEnd, BarTimeFrame.Day)
+                        asset.Symbol, dtStart, dtEnd, BarTimeFrame.Day)
                         |> broker.DataClient.ListHistoricalBarsAsync
                 return Ok (Seq.toArray page.Items)   // assume one page of results is sufficent
             with exn ->

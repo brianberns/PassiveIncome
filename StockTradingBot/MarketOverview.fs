@@ -5,9 +5,17 @@ open System.ServiceModel.Syndication
 
 type Candidate =
     {
-        Symbol : string
+        Asset : Asset
         Reason : string
     }
+
+module Candidate =
+
+    let create asset reason =
+        {
+            Asset = asset
+            Reason = reason
+        }
 
 type MarketOverview =
     {
@@ -21,6 +29,12 @@ type MarketOverviewResult =
     | ChatError of exn
 
 module MarketOverview =
+
+    let create trend candidates =
+        {
+            Trend = trend
+            Candidates = candidates
+        }
 
     let private isPersonal : NewsItemFilter =
         fun item ->
@@ -52,11 +66,11 @@ module MarketOverview =
 
     let private getPrompt utcNow items =
         String.concat "\n" [
-            "As a stock trader, scan the news items below for timely ideas. \
-            Identify a) the broad market/sector trend they collectively \
-            suggest, and b) the specific US stock symbols that are most \
-            directly affected and worth a closer look. Return ONLY ticker \
-            symbols (not company names) for liquid US equities."
+            "As a savvy stock trader, scan the news items below for timely \
+            ideas. Identify a) the broad market/sector trend they \
+            collectively suggest, and b) the specific US stock symbols that \
+            are most directly affected and worth a closer look. Return ONLY \
+            ticker symbols (not company names) for liquid US equities."
             for (item : SyndicationItem) in items do
                 ""
                 $"Title: {item.Title.Text}"
@@ -66,6 +80,26 @@ module MarketOverview =
                     Math.Round(age.TotalHours, 1)
                 $"Publication age: %.1f{hours} hours"
         ]
+
+    type private CandidateDto =
+        {
+            Symbol : string
+            Reason : string
+        }
+
+    type private MarketOverviewDto =
+        {
+            Trend : string
+            Candidates : CandidateDto[]
+        }
+
+    let private ofDto overviewDto =
+        overviewDto.Candidates
+            |> Array.map (fun candDto ->
+                Candidate.create
+                    (Asset.create candDto.Symbol)
+                    candDto.Reason)
+            |> create overviewDto.Trend
 
     let getAsync httpClient agent =
         async {
@@ -95,7 +129,7 @@ module MarketOverview =
                             utcNow - item.PublishDate.UtcDateTime < oneDay)
                         |> Seq.sortByDescending _.PublishDate
                         |> getPrompt utcNow
-                match! Agent.getResultAsync<MarketOverview> prompt agent with
-                    | Ok overview -> return Overview overview
+                match! Agent.getResultAsync<MarketOverviewDto> prompt agent with
+                    | Ok dto -> return Overview (ofDto dto)
                     | Error exn ->  return ChatError exn
         }
