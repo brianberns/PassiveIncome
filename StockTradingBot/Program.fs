@@ -39,12 +39,12 @@ module Program =
                             for inv in invs do
                                 printfn $"{inv.Asset.Symbol} {inv.Action}: {inv.Reason}"
                         | Error exn ->
-                            printfn $"{exn.Message}"
+                            printfn $"Asset investigation error: {exn.Message}"
                 | FeedErrors errors ->
                     for feed, exn in errors do
-                        printfn $"Error in {feed.Name} news feed: {exn.Message}"
+                        printfn $"News feed error: {feed.Name}: {exn.Message}"
                 | ChatError exn ->
-                    printfn $"{exn.Message}"
+                    printfn $"Market overview error: {exn.Message}"
         } |> Async.RunSynchronously
 
     let test () =

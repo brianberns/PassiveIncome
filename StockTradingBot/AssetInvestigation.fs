@@ -58,14 +58,14 @@ module AssetInvestigation =
             return candidate, result
         }
 
-    type private AssetInvestigationDto =
+    type AssetInvestigationDto =
         {
             Symbol : string
             Action : AssetAction
             Reason : string
         }
 
-    let private ofDto dto =
+    let ofDto dto =
         create
             (Asset.create dto.Symbol)
             dto.Action
@@ -88,7 +88,7 @@ module AssetInvestigation =
                             | Error error -> Choice2Of2 (cand, error))
 
             for cand, (feed, exn) in candErrors do
-                printfn $"{cand.Asset.Symbol}: {exn.Message}"
+                printfn $"Asset investigation error: {cand.Asset.Symbol}: {exn.Message}"
 
             let utcNow = DateTime.UtcNow
             let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
