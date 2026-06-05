@@ -155,7 +155,9 @@ module MarketOverview =
                         utcNow - item.PublishDate.UtcDateTime < oneDay)
                     |> Seq.sortByDescending _.PublishDate
                     |> getPrompt utcNow
-            match! Agent.getResultAsync<MarketOverviewDto> prompt agent with
+            let! dtoResult =
+                Agent.getResultAsync<MarketOverviewDto> prompt agent
+            match dtoResult with
                 | Ok dto -> return Success (ofDto dto)
                 | Error exn ->  return AgentError exn
         }
