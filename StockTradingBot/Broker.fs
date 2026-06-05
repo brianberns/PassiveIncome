@@ -104,10 +104,10 @@ module Broker =
             try
                 let! page =
                     let utcNow = DateTime.UtcNow
-                    let lookback = utcNow - TimeSpan.FromDays(14)
+                    let dtStart = utcNow - TimeSpan.FromDays(14)
+                    let dtEnd = utcNow - TimeSpan.FromMinutes(15.0)   // most recent bars not available for free
                     HistoricalBarsRequest(
-                        symbol, lookback, utcNow, BarTimeFrame.Day,
-                        Feed = MarketDataFeed.Iex)   // only feed available for free
+                        symbol, dtStart, dtEnd, BarTimeFrame.Day)   
                         |> broker.DataClient.ListHistoricalBarsAsync
                 return Ok (Seq.toArray page.Items)   // assume one page of results is sufficent
             with exn ->
