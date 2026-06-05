@@ -40,7 +40,11 @@ module Program =
         } |> Async.RunSynchronously
 
     let test () =
-        printfn "%A" (Broker.create config)
+        let broker = Broker.create config
+        async {
+            let! portfolio = Broker.getPortfolio broker
+            printfn "%A" portfolio.TradableCash
+        } |> Async.RunSynchronously
 
     // run ()
     test ()
