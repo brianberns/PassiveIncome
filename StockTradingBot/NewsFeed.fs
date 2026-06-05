@@ -52,31 +52,3 @@ module NewsFeed =
             with exn ->
                 return Error (newsFeed, exn)
         } |> Async.AwaitTask
-
-    let private isPersonal : NewsItemFilter =
-        fun item ->
-            item.Title.Text.Split([| ' '; ''' |])
-                |> Array.contains("I")
-
-    let feeds =
-        [
-            create
-                "MarketWatch Top Stories"
-                "https://feeds.content.dowjones.io/public/rss/mw_topstories"
-                [
-                    NewsItemFilter.hasSummary
-                    (isPersonal >> not)   // filter out personal finance stories
-                ]
-            create
-                "CNBC Top News"
-                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
-                [ NewsItemFilter.hasSummary ]
-            create
-                "CNBC Finance"
-                "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
-                [ NewsItemFilter.hasSummary ]
-            create
-                "Yahoo S&P 500"
-                "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"   // ^GSPC = S&P 500
-                [ NewsItemFilter.hasSummary ]
-        ]
