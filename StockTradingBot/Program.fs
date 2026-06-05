@@ -46,10 +46,10 @@ module Program =
             printfn "%A" portfolio
             let! isOpen = Broker.isMarketOpen broker
             printfn "%A" isOpen
-            match! Broker.fetchBars (Symbol "AAPL") broker with
+            match! Broker.getBars (Symbol "AAPL") broker with
                 | Ok bars ->
                     for bar in bars do
-                        printfn "%A - %A" (Usd bar.Open) (Usd bar.Close)
+                        printfn "%A: %A - %A" bar.TimeUtc (Usd bar.Open) (Usd bar.Close)
                 | Error exn -> printfn "%A" exn
         } |> Async.RunSynchronously
 

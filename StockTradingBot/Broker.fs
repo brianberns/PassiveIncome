@@ -99,7 +99,7 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
-    let fetchBars (Symbol symbol) broker =
+    let getBars (Symbol symbol) broker =
         task {
             try
                 let! page =
@@ -107,7 +107,7 @@ module Broker =
                     let dtStart = utcNow - TimeSpan.FromDays(14)
                     let dtEnd = utcNow - TimeSpan.FromMinutes(15.0)   // most recent bars not available for free
                     HistoricalBarsRequest(
-                        symbol, dtStart, dtEnd, BarTimeFrame.Day)   
+                        symbol, dtStart, dtEnd, BarTimeFrame.Day)
                         |> broker.DataClient.ListHistoricalBarsAsync
                 return Ok (Seq.toArray page.Items)   // assume one page of results is sufficent
             with exn ->
