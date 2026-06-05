@@ -1,5 +1,6 @@
 ﻿namespace StockTradingBot
 
+open System
 open System.Net.Http
 open System.Reflection
 
@@ -13,18 +14,16 @@ module Program =
             .AddUserSecrets(assembly)
             .Build()
 
+    let agent = Agent.create config
+
+    let httpClient =
+        let client = new HttpClient()
+        client.DefaultRequestHeaders
+            .UserAgent
+            .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
+        client
+
     let run () =
-
-            // create HTTP client
-        use httpClient =
-            let client = new HttpClient()
-            client.DefaultRequestHeaders
-                .UserAgent
-                .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
-            client
-
-            // create agent
-        use agent = Agent.create config
 
         async {
             match! MarketOverview.getAsync httpClient agent with
@@ -53,5 +52,20 @@ module Program =
                 | Error exn -> printfn "%A" exn
         } |> Async.RunSynchronously
 
-    run ()
-    // test ()
+    let test2() =
+        async {
+            let! result =
+                AssetInvestigation.getAsync
+                    httpClient agent (Symbol "AAPL")
+            match result with
+                | Ok items ->
+                    for item in items do
+                        printfn ""
+                        printfn "%s" item.Title.Text
+                        printfn "%s" item.Summary.Text
+                | Error error -> printfn "%A" error
+        } |> Async.RunSynchronously
+
+    Console.OutputEncoding <- Text.Encoding.UTF8
+    // run ()
+    test2 ()
