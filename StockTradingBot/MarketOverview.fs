@@ -3,44 +3,58 @@ namespace StockTradingBot
 open System
 open System.ServiceModel.Syndication
 
+/// Asset that we might be interested in.
 type Candidate =
     {
+        /// Candidate asset.
         Asset : Asset
+
+        /// Reason for interest.
         Reason : string
     }
 
 module Candidate =
 
+    /// Creates a candidate.
     let create asset reason =
         {
             Asset = asset
             Reason = reason
         }
 
+/// Overview of the market.
 type MarketOverview =
     {
+        /// Overall market trend.
         Trend : string
+
+        /// Candidate assets for trading.
         Candidates : Candidate[]
     }
 
+/// Results possible when determining market overview.
 type MarketOverviewResult =
-    | Overview of MarketOverview
+    | Success of MarketOverview
     | FeedErrors of (NewsFeed * exn)[]
-    | ChatError of exn
+    | AgentError of exn
 
 module MarketOverview =
 
+    /// Creates a market overview.
     let create trend candidates =
         {
             Trend = trend
             Candidates = candidates
         }
 
+    /// The given item relates to personal finance, rather than
+    /// investing.
     let private isPersonal : NewsItemFilter =
         fun item ->
             item.Title.Text.Split([| ' '; ''' |])   // isolate "I" from "I'm"
                 |> Array.contains("I")
 
+    /// General market news feeds.
     let private feeds =
         [
             NewsFeed.create
@@ -64,6 +78,7 @@ module MarketOverview =
                 [ NewsItemFilter.hasSummary ]
         ]
 
+    /// Creates a prompt for the given news items.
     let private getPrompt utcNow items =
         String.concat "\n" [
             "As a savvy stock trader, scan the news items below for timely \
@@ -81,19 +96,28 @@ module MarketOverview =
                 $"Publication age: %.1f{hours} hours"
         ]
 
+    /// Candidate DTO. (Sadly, has to be public for serialization.)
     type CandidateDto =
         {
+            /// Candidate asset symbol.
             Symbol : string
+
+            /// Reason for interest.
             Reason : string
         }
 
+    /// Market overview DTO. (Sadly, has to be public for serialization.)
     type MarketOverviewDto =
         {
+            /// Overall market trend.
             Trend : string
+
+            /// Candidate assets for trading.
             Candidates : CandidateDto[]
         }
 
-    let ofDto overviewDto =
+    /// Creates a market overview from the given DTO.
+    let private ofDto overviewDto =
         overviewDto.Candidates
             |> Array.map (fun candDto ->
                 Candidate.create
@@ -101,6 +125,10 @@ module MarketOverview =
                     candDto.Reason)
             |> create overviewDto.Trend
 
+    /// Determines the current market overview:
+    ///    1. Fetch general news items from feeds.
+    ///    2. Asks agent to identify overall market trend and
+    ///       candidate assets from those news items.
     let getAsync httpClient agent =
         async {
                 // fetch news items
@@ -118,7 +146,7 @@ module MarketOverview =
             if errors.Length > 0 then
                 return FeedErrors errors
             else
-                    // get market overview
+                    // use news items to get market overview
                 let prompt =
                     let utcNow = DateTime.UtcNow
                     let oneDay = TimeSpan.FromDays(1)
@@ -130,6 +158,6 @@ module MarketOverview =
                         |> Seq.sortByDescending _.PublishDate
                         |> getPrompt utcNow
                 match! Agent.getResultAsync<MarketOverviewDto> prompt agent with
-                    | Ok dto -> return Overview (ofDto dto)
-                    | Error exn ->  return ChatError exn
+                    | Ok dto -> return Success (ofDto dto)
+                    | Error exn ->  return AgentError exn
         }

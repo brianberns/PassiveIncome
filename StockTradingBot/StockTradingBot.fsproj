@@ -11,7 +11,7 @@
     <Compile Include="Broker.fs" />
     <Compile Include="Agent.fs" />
     <Compile Include="MarketOverview.fs" />
-    <Compile Include="AssetInvestigation.fs" />
+    <Compile Include="AssetRecommendation.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -3,20 +3,28 @@ namespace StockTradingBot
 open System
 open System.ServiceModel.Syndication
 
+/// Actions we can take on an asset.
 type AssetAction =
     | Buy = 0   // must be a .NET enum for serialization
     | Sell = 1
     | Hold = 2
 
-type AssetInvestigation =
+/// Recommended action for an asset.
+type AssetRecommendation =
     {
+        /// Asset in question.
         Asset : Asset
+
+        /// Recommended action.
         Action : AssetAction
+
+        /// Reason for recommendation.
         Reason : string
     }
 
-module AssetInvestigation =
+module AssetRecommendation =
 
+    /// Creates an asset recommendation.
     let create asset action reason =
         {
             Asset = asset
@@ -24,12 +32,14 @@ module AssetInvestigation =
             Reason = reason
         }
 
+    /// Gets a news feed specific to the given asset.
     let private getFeed asset =
         NewsFeed.create
             $"Yahoo {asset.Symbol}"
             $"https://feeds.finance.yahoo.com/rss/2.0/headline?s={asset.Symbol}&region=US&lang=en-US"
             [ NewsItemFilter.hasSummary ]
 
+    /// Creates a prompt for the given candidate assets.
     let private getPrompt utcNow marketTrend candidateNews =
         String.concat "\n" [
             "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
@@ -53,7 +63,8 @@ module AssetInvestigation =
                     $"Publication age: %.1f{hours} hours"
         ]
 
-    let private getCandidateResult httpClient (candidate : Candidate) =
+    /// Gets news items for the given candidate asset.
+    let private getCandidateNewsItems httpClient (candidate : Candidate) =
         async {
             let! result =
                 getFeed candidate.Asset
@@ -61,25 +72,29 @@ module AssetInvestigation =
             return candidate, result
         }
 
-    type AssetInvestigationDto =
+    /// Asset recommendation DTO. (Sadly, has to be public for serialization.)
+    type AssetRecommendationDto =
         {
             Symbol : string
             Action : AssetAction
             Reason : string
         }
 
-    let ofDto dto =
+    /// Creates an asset recommendation from the given DTO.
+    let private ofDto dto =
         create
             (Asset.create dto.Symbol)
             dto.Action
             dto.Reason
 
+    /// Determines asset recommendations from the given market
+    /// overview.
     let getAsync httpClient agent marketOverview =
         async {
                 // fetch news items
             let! candResults =
                 marketOverview.Candidates
-                    |> Seq.map (getCandidateResult httpClient)
+                    |> Seq.map (getCandidateNewsItems httpClient)
                     |> Async.Parallel
 
                 // handle errors
@@ -91,11 +106,11 @@ module AssetInvestigation =
                             | Error error -> Choice2Of2 (cand, error))
 
             for cand, (feed, exn) in candErrors do
-                printfn $"Asset investigation error: {cand.Asset.Symbol}: {exn.Message}"
+                printfn $"Asset recommendation error: {cand.Asset.Symbol}: {exn.Message}"
 
             let utcNow = DateTime.UtcNow
             let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
-            match! Agent.getResultAsync<AssetInvestigationDto[]> prompt agent with
+            match! Agent.getResultAsync<AssetRecommendationDto[]> prompt agent with
                 | Ok dtos ->
                     return Ok (Array.map ofDto dtos)
                 | Error exn ->
