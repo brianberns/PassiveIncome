@@ -27,7 +27,7 @@ module Program =
         use agent = Agent.create config
 
         async {
-            match! Agent.getMarketOverviewAsync httpClient agent with
+            match! MarketOverview.getAsync httpClient agent with
                 | Overview overview ->
                     printfn $"Trend: {overview.Trend}"
                     for candidate in overview.Candidates do
@@ -53,5 +53,5 @@ module Program =
                 | Error exn -> printfn "%A" exn
         } |> Async.RunSynchronously
 
-    // run ()
-    test ()
+    run ()
+    // test ()
