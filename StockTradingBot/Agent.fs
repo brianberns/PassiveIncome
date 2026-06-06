@@ -8,6 +8,28 @@ open Microsoft.Extensions.Configuration
 
 open OpenAI
 
+type Model =
+    {
+        /// Model ID.
+        Id : string
+
+        /// Name of API key in config.
+        ApiKeyName : string
+
+        /// Modle endpoint.
+        Endpoint : string
+    }
+
+module Model =
+
+    /// Google Gemini.
+    let gemini =
+        {
+            Id = "gemini-3.5-flash"
+            ApiKeyName = "Gemini:ApiKey"
+            Endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        }
+
 /// Decision-making agent.
 type Agent =
     {
@@ -26,19 +48,16 @@ type Agent =
 
 module Agent =
 
-    let private modelId = "gemini-3.5-flash"
-    let private apiKey = "Gemini:ApiKey"
-    let private endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
-
     /// Creates an agent.
-    let create (config : IConfiguration) =
+    let create (config : IConfiguration) model =
         let openAIClient =
             OpenAIClient(
-                ApiKeyCredential(config[apiKey]),
-                OpenAIClientOptions(Endpoint = Uri(endpoint)))
+                ApiKeyCredential(config[model.ApiKeyName]),
+                OpenAIClientOptions(
+                    Endpoint = Uri(model.Endpoint)))
         let chatClient =
             openAIClient
-                .GetChatClient(modelId)
+                .GetChatClient(model.Id)
                 .AsIChatClient()
         {
             ChatClient = chatClient
