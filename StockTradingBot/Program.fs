@@ -83,23 +83,35 @@ module Program =
                     |> Async.Sequential
 
                 // compute spendable cash
-            let totalSales =
-                sellResults
-                    |> Seq.sumBy (fun (_, quantity, result) ->
-                        match result with
-                            | Ok avgPrice -> quantity * avgPrice
-                            | Error _ -> Money.Zero)
             let cash =
+                let totalSales =
+                    sellResults
+                        |> Seq.sumBy (fun (_, quantity, result) ->
+                            match result with
+                                | Ok avgPrice -> quantity * avgPrice
+                                | Error _ -> Money.Zero)
                 let slush = Usd 1m
                 portfolio.TradableCash + totalSales - slush
 
+                // buy
             if cash > Money.Zero then
-                ()
-
-            return sellResults
+                let! buyResults =
+                    let portion = cash / decimal buys.Length
+                    buys
+                        |> Seq.map (fun asset ->
+                            async {
+                                let! result =
+                                    Broker.buy asset portion broker
+                                return asset, portion, result
+                            })
+                        |> Async.Sequential
+                return sellResults, buyResults
+            else
+                return sellResults, Array.empty
         }
 
-    let printAssetResults sellResults =
+    let printAssetResults sellResults buyResults =
+
         printfn ""
         if Array.isEmpty sellResults then
             printfn "No sales"
@@ -112,6 +124,19 @@ module Program =
                             $"{quantity * avgPrice} total"
                         | Error (exn : exn) -> exn.Message
                 printfn $"   Sell {quantity} shares of {asset}: {msg}"
+
+        printfn ""
+        if Array.isEmpty buyResults then
+            printfn "No buys"
+        else
+            printfn "Buys:"
+            for asset, totalPrice, result in buyResults do
+                let msg =
+                    match result with
+                        | Ok _ ->
+                            $"{totalPrice} total"
+                        | Error (exn : exn) -> exn.Message
+                printfn $"   Buy {asset}: {msg}"
 
     let runOverview portfolio marketOverview =
         async {
@@ -135,8 +160,9 @@ module Program =
                                     when reco.Action <> AssetAction.Hold ->
                                     Some reco
                                 | _ -> None)
-                    let! sellResults = placeOrders portfolio recos
-                    printAssetResults sellResults
+                    let! sellResults, buyResults =
+                        placeOrders portfolio recos
+                    printAssetResults sellResults buyResults
                 | AgentError exn ->
                     printfn $"Asset recommendation error: {exn.Message}"
         }

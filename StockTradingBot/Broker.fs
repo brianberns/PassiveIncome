@@ -29,6 +29,10 @@ type Money =
     static member (*)(n : decimal, Usd usd) =
         Usd (n * usd)
 
+    /// Division.
+    static member (/)(Usd usd, n : decimal) =
+        Usd (usd / n)
+
     /// Display string.
     member money.String =
         let (Usd usd) = money
