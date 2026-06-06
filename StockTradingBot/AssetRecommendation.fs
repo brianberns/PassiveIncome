@@ -109,6 +109,21 @@ module AssetRecommendation =
             Reason : string
         }
 
+    /// Determines recommendations for the given candidates.
+    let getRecommendationDtos agent utcNow marketTrend candItemArrays =
+        async {
+            let prompt =
+                candItemArrays
+                    |> Seq.map (
+                        fun (cand : Candidate, items : SyndicationItem[]) ->
+                            cand,
+                            items |> Seq.sortByDescending _.PublishDate)
+                    |> getPrompt utcNow marketTrend
+            return!
+                Agent.getResultAsync<AssetRecommendationDto[]>
+                    prompt agent
+        }
+
     /// Creates an asset recommendation from the given DTO.
     let private ofDto dto =
         create
@@ -122,14 +137,8 @@ module AssetRecommendation =
         async {
                 // query agent
             let! dtosResult =
-                let prompt =
-                    candItemArrays
-                        |> Seq.map (
-                            fun (cand , items : SyndicationItem[]) ->
-                                (cand : Candidate),
-                                items |> Seq.sortByDescending _.PublishDate)
-                        |> getPrompt utcNow marketOverview.Trend
-                Agent.getResultAsync<AssetRecommendationDto[]> prompt agent
+                getRecommendationDtos
+                    agent utcNow marketOverview.Trend candItemArrays
 
                 // process result
             match dtosResult with
