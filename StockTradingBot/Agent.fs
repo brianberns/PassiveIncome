@@ -1,24 +1,23 @@
 namespace StockTradingBot
 
 open System
+open System.ClientModel
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
 
+open OpenAI
+
 /// Decision-making agent.
 type Agent =
     {
-        /// Gemini.
-        GoogleClient : Google.GenAI.Client
-
-        /// .NET wrapper.
+        /// .NET wrapper around chat API.
         ChatClient : IChatClient
     }
 
     /// Cleanup.
     member this.Dispose() =
         this.ChatClient.Dispose()
-        this.GoogleClient.Dispose()
 
     interface IDisposable with
 
@@ -27,17 +26,21 @@ type Agent =
 
 module Agent =
 
-    let private modelId = "gemini-2.5-flash"
+    let private modelId = "gemini-3.5-flash"
+    let private apiKey = "Gemini:ApiKey"
+    let private endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     /// Creates an agent.
     let create (config : IConfiguration) =
-        let googleClient =
-            new Google.GenAI.Client(
-                apiKey = config["Gemini:ApiKey"])
+        let openAIClient =
+            OpenAIClient(
+                ApiKeyCredential(config[apiKey]),
+                OpenAIClientOptions(Endpoint = Uri(endpoint)))
         let chatClient =
-            googleClient.AsIChatClient(modelId)
+            openAIClient
+                .GetChatClient(modelId)
+                .AsIChatClient()
         {
-            GoogleClient = googleClient
             ChatClient = chatClient
         }
 
