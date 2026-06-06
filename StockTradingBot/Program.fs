@@ -85,7 +85,7 @@ module Program =
         }
 
     let printPortfolio (portfolio : Portfolio) =
-        printfn "Portfolio"
+        printfn "Portfolio:"
         printfn $"   Tradable cash: {portfolio.TradableCash}"
         for (asset, value) in Map.toSeq portfolio.PositionMap do
             printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
