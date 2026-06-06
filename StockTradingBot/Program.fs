@@ -90,23 +90,15 @@ module Program =
         for (asset, value) in Map.toSeq portfolio.PositionMap do
             printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
 
-    let printMarketOverview marketOverview =
-        printfn $"Trend: {marketOverview.Trend}"
-        printfn ""
-        printfn "Candidates:"
-        for candidate in marketOverview.Candidates do
-            printfn ""
-            printfn $"{candidate.Asset.Symbol}"
-            printfn $"{candidate.Reason}"
-
     let printAssetRecommendations results =
         printfn "Recommendations:"
         for result in results do
             printfn ""
             match result with
                 | Ok reco ->
-                    printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                    printfn $"{reco.Reason}"
+                    if reco.Action <> AssetAction.Hold then
+                        printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                        printfn $"{reco.Reason}"
                 | Error (asset : Asset, exn : exn) ->
                     printfn $"Asset error: {asset}: {exn.Message}"
 
@@ -132,25 +124,21 @@ module Program =
 
     let runOverview portfolio marketOverview =
         async {
-                // all assets in portfolio are candidates
-            let portfolioCandidates =
-                portfolio.PositionMap.Keys
-                    |> Seq.map (fun asset ->
-                        Candidate.create asset "In portfolio")
-
                 // get asset recommendations for all candidates
-            printfn ""
-            printMarketOverview marketOverview
-            let allCandidates =
-                set [
-                    yield! portfolioCandidates
-                    yield! marketOverview.Candidates
-                ]
             let! result =
+                let candidates =
+                    let portfolioCandidates =
+                        portfolio.PositionMap.Keys
+                            |> Seq.map (fun asset ->
+                                Candidate.create asset "In portfolio")
+                    set [
+                        yield! portfolioCandidates
+                        yield! marketOverview.Candidates
+                    ]
                 AssetRecommendation.getAsync
                     httpClient agent
                     marketOverview.Trend
-                    allCandidates
+                    candidates
 
                 // make trades based on recommendations
             printfn ""

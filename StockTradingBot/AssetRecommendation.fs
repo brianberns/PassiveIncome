@@ -55,8 +55,8 @@ module AssetRecommendation =
     let private getPrompt utcNow marketTrend candidateNews =
         String.concat "\n" [
             "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
-            each stock symbol listed below based on the its news items and \
-            the current overall market trend."
+            each stock symbol listed below based on its rationale, its detailed \
+            news items, and the overall market trend."
             ""
             $"Trend: %s{marketTrend}"
             for (candidate : Candidate, items : seq<_>) in candidateNews do
@@ -64,7 +64,7 @@ module AssetRecommendation =
                 "###################"
                 ""
                 $"Asset: {candidate.Asset.Symbol}"
-                $"Hunch: {candidate.Reason}"
+                $"Rationale: {candidate.Reason}"
                 for (item : SyndicationItem) in items do
                     ""
                     $"Title: {item.Title.Text}"
@@ -161,8 +161,7 @@ module AssetRecommendation =
                 // get news items
             let utcNow = DateTime.UtcNow
             let! candItemArrays, candErrors =
-                getNewsItems
-                    httpClient utcNow candidates
+                getNewsItems httpClient utcNow candidates
 
                 // news feed errors for some assets don't prevent success for other assets
             let feedErrorResults =
