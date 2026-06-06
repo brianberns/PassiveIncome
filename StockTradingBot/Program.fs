@@ -38,32 +38,46 @@ module Program =
             printfn $"{candidate.Asset.Symbol}"
             printfn $"{candidate.Reason}"
 
-    let printAssetRecommendation (result : AssetRecommendationResult) =
-        match result with
-            | Success results ->
-                printfn "Recommendations:"
-                for result in results do
-                    printfn ""
-                    match result with
-                        | Ok reco ->
-                            printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                            printfn $"{reco.Reason}"
-                        | Error (asset, exn) ->
-                            printfn $"Asset error: {asset}: {exn.Message}"
-            | AgentError exn ->
-                printfn $"Asset recommendation error: {exn.Message}"
+    let printAssetRecommendations results =
+        printfn "Recommendations:"
+        for result in results do
+            printfn ""
+            match result with
+                | Ok reco ->
+                    printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                    printfn $"{reco.Reason}"
+                | Error (asset : Asset, exn : exn) ->
+                    printfn $"Asset error: {asset}: {exn.Message}"
 
-    let runOverview marketOverview =
+    let runOverview portfolioAssets marketOverview =
         async {
+                // all assets in portfolio are candidates
+            let portfolioCandidates =
+                portfolioAssets
+                    |> Seq.map (fun asset ->
+                        Candidate.create asset "In portfolio")
+
+                // get asset recommendations for all candidates
             printfn ""
             printMarketOverview marketOverview
+            let allCandidates =
+                set [
+                    yield! portfolioCandidates
+                    yield! marketOverview.Candidates
+                ]
             let! result =
                 AssetRecommendation.getAsync
                     httpClient agent
                     marketOverview.Trend
-                    marketOverview.Candidates
+                    allCandidates
+
+                // make trades based on recommendations
             printfn ""
-            printAssetRecommendation result
+            match result with
+                | Success results ->
+                    printAssetRecommendations results
+                | AgentError exn ->
+                    printfn $"Asset recommendation error: {exn.Message}"
         }
 
     let run () =
@@ -73,7 +87,7 @@ module Program =
                     printPortfolio portfolio
                     match! MarketOverview.getAsync httpClient agent with
                         | MarketOverviewResult.Success overview ->
-                            do! runOverview overview
+                            do! runOverview portfolio.PositionMap.Keys overview
                         | FeedErrors errors ->
                             for feed, exn in errors do
                                 printfn $"News feed error: {feed.Name}: {exn.Message}"
