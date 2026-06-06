@@ -27,7 +27,7 @@ type Agent =
 
 module Agent =
 
-    let private modelId = "gemini-2.5-flash-lite"
+    let private modelId = "gemini-2.5-flash"
 
     /// Creates an agent.
     let create (config : IConfiguration) =

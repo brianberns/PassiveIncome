@@ -58,7 +58,7 @@ module AssetRecommendation =
             the current overall market trend."
             ""
             $"Trend: %s{marketTrend}"
-            for (candidate : Candidate, items : _[]) in candidateNews do
+            for (candidate : Candidate, items : seq<_>) in candidateNews do
                 ""
                 "###################"
                 ""
@@ -101,17 +101,6 @@ module AssetRecommendation =
                         | Error error -> Choice2Of2 (cand, error))
         }
 
-    /// Extracts candidate news pairs.
-    let private getCandidateNews candItemArrays =
-        [|
-            for (cand : Candidate), (items : SyndicationItem[]) in candItemArrays do
-                let items =
-                    items
-                        |> Seq.sortByDescending _.PublishDate
-                        |> Seq.toArray
-                cand, items
-        |]
-
     /// Asset recommendation DTO.
     type (*private*) AssetRecommendationDto =
         {
@@ -134,7 +123,11 @@ module AssetRecommendation =
                 // query agent
             let! dtosResult =
                 let prompt =
-                    getCandidateNews candItemArrays
+                    candItemArrays
+                        |> Seq.map (
+                            fun (cand , items : SyndicationItem[]) ->
+                                (cand : Candidate),
+                                items |> Seq.sortByDescending _.PublishDate)
                         |> getPrompt utcNow marketOverview.Trend
                 Agent.getResultAsync<AssetRecommendationDto[]> prompt agent
 
