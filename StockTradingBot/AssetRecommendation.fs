@@ -156,13 +156,13 @@ module AssetRecommendation =
     /// overview:
     ///    1. Fetches news items specific to the candidate assets.
     ///    2. Asks agent to recommend an action for each asset.
-    let getAsync httpClient agent marketOverview =
+    let getAsync httpClient agent marketTrend candidates =
         async {
                 // get news items
             let utcNow = DateTime.UtcNow
             let! candItemArrays, candErrors =
                 getNewsItems
-                    httpClient utcNow marketOverview.Candidates
+                    httpClient utcNow candidates
 
                 // news feed errors for some assets don't prevent success for other assets
             let feedErrorResults =
@@ -174,11 +174,11 @@ module AssetRecommendation =
                 // get recommendations
             let! dtosResult =
                 getRecommendationDtos
-                    agent utcNow marketOverview.Trend candItemArrays
+                    agent utcNow marketTrend candItemArrays
             match dtosResult with
                 | Ok dtos ->
                     let successResults =
-                        createRecommendations marketOverview.Candidates dtos
+                        createRecommendations candidates dtos
                     return Success [|
                         yield! feedErrorResults
                         yield! successResults
