@@ -61,25 +61,13 @@ module Program =
 
     let runOverview portfolio marketOverview =
         async {
-                // all assets in portfolio are candidates
-            let portfolioCandidates =
-                portfolio.PositionMap.Keys
-                    |> Seq.map (fun asset ->
-                        Candidate.create asset "In portfolio")
-
                 // get asset recommendations for all candidates
             printfn ""
             printMarketOverview marketOverview
-            let allCandidates =
-                set [
-                    yield! portfolioCandidates
-                    yield! marketOverview.Candidates
-                ]
             let! result =
                 AssetRecommendation.getAsync
                     httpClient agent
-                    marketOverview.Trend
-                    allCandidates
+                    marketOverview
 
                 // make trades based on recommendations
             printfn ""
