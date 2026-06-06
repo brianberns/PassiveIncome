@@ -1,0 +1,36 @@
+namespace StockTradingBot
+
+/// Money, cash, moola...
+[<StructuredFormatDisplay("{String}")>]
+type Money =
+
+    /// U.S. dollars ($).
+    | Usd of decimal
+
+    /// Zero.
+    static member Zero = Usd 0m
+
+    /// Addition.
+    static member (+)(Usd a, Usd b) =
+        Usd (a + b)
+
+    /// Subtraction.
+    static member (-)(Usd a, Usd b) =
+        Usd (a - b)
+
+    /// Multiplication.
+    static member (*)(n : decimal, Usd usd) =
+        Usd (n * usd)
+
+    /// Division.
+    static member (/)(Usd usd, n : decimal) =
+        Usd (usd / n)
+
+    /// Display string.
+    member money.String =
+        let (Usd usd) = money
+        $"${usd}"
+
+    /// Display string.
+    override money.ToString() =
+        money.String
