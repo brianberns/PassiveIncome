@@ -8,11 +8,16 @@ open Microsoft.Extensions.Configuration
 open Alpaca.Markets
 
 /// An investment asset, such as stock in a company.
+[<StructuredFormatDisplay("{Symbol}")>]
 type Asset =
     {
         /// Asset symbol. E.g. Apple = "AAPL".
         Symbol : string
     }
+
+    /// Display string.
+    override asset.ToString() =
+        asset.Symbol
 
 module Asset =
 
@@ -175,7 +180,7 @@ module Broker =
 
     let buy asset (Usd usd) broker =
         async {
-            let usd = (usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
+            let usd = Math.Truncate(usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
             let order =
                 MarketOrder.Buy(
                     asset.Symbol,
