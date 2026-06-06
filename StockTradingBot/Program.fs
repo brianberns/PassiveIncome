@@ -50,18 +50,54 @@ module Program =
                     printfn $"Asset error: {asset}: {exn.Message}"
 
     let placeOrders portfolio recommendations =
+
+            // separate sells from buys
         let sells, buys =
             recommendations
-                |> Array.partition (fun reco ->
+                |> Array.partitionWith (fun reco ->
                     match reco.Action with
-                        | AssetAction.Sell -> true
-                        | AssetAction.Buy -> false
+                        | AssetAction.Sell -> Choice1Of2 reco.Asset
+                        | AssetAction.Buy -> Choice2Of2 reco.Asset
                         | _ -> failwith "Unexpected")
-        ()
+
+            // can only sell assets we own
+        let sellQuantities =
+            Array.choose (fun asset ->
+                portfolio.PositionMap
+                    |> Map.tryFind asset
+                    |> Option.map (fun value ->
+                        asset, value.Quantity))
+                sells
+
+        async {
+            let! sellResults =
+                sellQuantities
+                    |> Seq.map (fun (asset, quantity) ->
+                        async {
+                            let! result =
+                                Broker.sell asset quantity broker
+                            return asset, quantity, result
+                        })
+                    |> Async.Sequential
+            return sellResults
+        }
+
+    let printAssetResults sellResults =
+        printfn ""
+        if Array.isEmpty sellResults then
+            printfn "No sales"
+        else
+            printfn "Sales:"
+            for asset, quantity, result in sellResults do
+                let msg =
+                    match result with
+                        | Ok () -> "Success"
+                        | Error (exn : exn) -> exn.Message
+                printfn $"   Sell {quantity} shares of {asset}: {msg}"
 
     let runOverview portfolio marketOverview =
         async {
-                // get asset recommendations for all candidates
+                // get asset recommendations for each candidate
             printfn ""
             printMarketOverview marketOverview
             let! result =
@@ -81,7 +117,8 @@ module Program =
                                     when reco.Action <> AssetAction.Hold ->
                                     Some reco
                                 | _ -> None)
-                    placeOrders portfolio recos
+                    let! sellResults = placeOrders portfolio recos
+                    printAssetResults sellResults
                 | AgentError exn ->
                     printfn $"Asset recommendation error: {exn.Message}"
         }
