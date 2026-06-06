@@ -113,10 +113,10 @@ module Program =
     let printAssetResults sellResults buyResults =
 
         printfn ""
+        printfn "Sales:"
         if Array.isEmpty sellResults then
-            printfn "No sales"
+            printfn "   None"
         else
-            printfn "Sales:"
             for asset, quantity, result in sellResults do
                 let msg =
                     match result with
@@ -126,10 +126,10 @@ module Program =
                 printfn $"   Sell {quantity} shares of {asset}: {msg}"
 
         printfn ""
+        printfn "Buys:"
         if Array.isEmpty buyResults then
-            printfn "No buys"
+            printfn "   None"
         else
-            printfn "Buys:"
             for asset, totalPrice, result in buyResults do
                 let msg =
                     match result with
