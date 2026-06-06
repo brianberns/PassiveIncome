@@ -131,33 +131,34 @@ module AssetRecommendation =
             dto.Action
             dto.Reason
 
+    /// Creates recommendations for the given DTOs.
+    let private createRecommendations dtosResult candidates =
+        match dtosResult with
+            | Ok dtos ->
+                let recoMap =
+                    dtos
+                        |> Seq.map (fun dto ->
+                            let reco = ofDto dto
+                            reco.Asset, reco)
+                        |> Map
+                Success [|
+                    for (cand : Candidate) in candidates do
+                        match Map.tryFind cand.Asset recoMap with
+                            | Some reco -> Ok reco
+                            | None ->
+                                Error (cand.Asset, exn("Agent ignored"))
+                |]
+            | Error exn ->
+                AgentError exn
+
     /// Determines recommendations for the given candidates.
     let private getRecommendations
         agent utcNow marketOverview candItemArrays =
         async {
-                // query agent
             let! dtosResult =
                 getRecommendationDtos
                     agent utcNow marketOverview.Trend candItemArrays
-
-                // process result
-            match dtosResult with
-                | Ok dtos ->
-                    let recoMap =
-                        dtos
-                            |> Seq.map (fun dto ->
-                                let reco = ofDto dto
-                                reco.Asset, reco)
-                            |> Map
-                    return Success [|
-                        for cand in marketOverview.Candidates do
-                            match Map.tryFind cand.Asset recoMap with
-                                | Some reco -> Ok reco
-                                | None ->
-                                    Error (cand.Asset, exn("Agent ignored"))
-                    |]
-                | Error exn ->
-                    return AgentError exn
+            return createRecommendations dtosResult marketOverview.Candidates
         }
 
     /// Determines asset recommendations from the given market
