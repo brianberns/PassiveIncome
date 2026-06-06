@@ -102,16 +102,8 @@ module AssetRecommendation =
                         | Error error -> Choice2Of2 (cand, error))
         }
 
-    /// Asset recommendation DTO.
-    type (*private*) AssetRecommendationDto =
-        {
-            Symbol : string
-            Action : AssetAction
-            Reason : string
-        }
-
     /// Determines recommendations for the given candidates.
-    let getRecommendationDtos agent utcNow marketTrend candItemArrays =
+    let getRecommendations agent utcNow marketTrend candItemArrays =
         async {
             let prompt =
                 candItemArrays
@@ -121,16 +113,9 @@ module AssetRecommendation =
                             items |> Seq.sortByDescending _.PublishDate)
                     |> getPrompt utcNow marketTrend
             return!
-                Agent.getResultAsync<AssetRecommendationDto[]>
+                Agent.getResultAsync<AssetRecommendation[]>
                     prompt agent
         }
-
-    /// Creates an asset recommendation from the given DTO.
-    let private ofDto dto =
-        create
-            (Asset.create dto.Symbol)
-            dto.Action
-            dto.Reason
 
     /// Creates recommendations for the given DTOs.
     let private createRecommendations candidates dtos =
@@ -138,8 +123,7 @@ module AssetRecommendation =
             // map assets to generated recommendations
         let recoMap =
             dtos
-                |> Seq.map (fun dto ->
-                    let reco = ofDto dto
+                |> Seq.map (fun reco ->
                     reco.Asset, reco)
                 |> Map
 
@@ -171,13 +155,13 @@ module AssetRecommendation =
                 |]
 
                 // get recommendations
-            let! dtosResult =
-                getRecommendationDtos
+            let! recosResult =
+                getRecommendations
                     agent utcNow marketTrend candItemArrays
-            match dtosResult with
-                | Ok dtos ->
+            match recosResult with
+                | Ok recos ->
                     let successResults =
-                        createRecommendations candidates dtos
+                        createRecommendations candidates recos
                     return Success [|
                         yield! feedErrorResults
                         yield! successResults

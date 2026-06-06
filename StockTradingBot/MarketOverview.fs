@@ -112,35 +112,6 @@ module MarketOverview =
                 $"Publication age: %.1f{hours} hours"
         ]
 
-    /// Candidate DTO. (Sadly, has to be public for serialization.)
-    type (*private*) CandidateDto =
-        {
-            /// Candidate asset symbol.
-            Symbol : string
-
-            /// Reason for interest.
-            Reason : string
-        }
-
-    /// Market overview DTO.
-    type (*private*) MarketOverviewDto =
-        {
-            /// Overall market trend.
-            Trend : string
-
-            /// Candidate assets for trading.
-            Candidates : CandidateDto[]
-        }
-
-    /// Creates a market overview from the given DTO.
-    let private ofDto overviewDto =
-        overviewDto.Candidates
-            |> Array.map (fun candDto ->
-                Candidate.create
-                    (Asset.create candDto.Symbol)
-                    candDto.Reason)
-            |> create overviewDto.Trend
-
     /// Gets items from the given news feeds.
     let private getNewsItems httpClient feeds =
         async {
@@ -168,11 +139,11 @@ module MarketOverview =
                         |> Seq.distinctBy _.Id
                         |> Seq.sortByDescending _.PublishDate
                         |> getPrompt utcNow
-                Agent.getResultAsync<MarketOverviewDto> prompt agent
+                Agent.getResultAsync<MarketOverview> prompt agent
 
                 // process result
             match dtoResult with
-                | Ok dto -> return Success (ofDto dto)
+                | Ok overview -> return Success overview
                 | Error exn ->  return AgentError exn
         }
 
