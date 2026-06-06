@@ -1,6 +1,10 @@
 namespace StockTradingBot
 
+open System
+open System.Threading.Tasks
+
 open Microsoft.Extensions.Configuration
+
 open Alpaca.Markets
 
 /// Money, cash, moola...
@@ -130,3 +134,61 @@ module Broker =
             with exn ->
                 return Error exn
         } |> Async.AwaitTask
+
+    let private awaitOrder orderId broker =
+
+        let rec loop n =
+            task {
+                do! Task.Delay 250
+                let! order =
+                    broker.TradingClient.GetOrderAsync(orderId : Guid)
+                match order.OrderStatus with
+                    | OrderStatus.Filled ->
+                        return Ok ()
+                    | OrderStatus.Canceled
+                    | OrderStatus.Rejected
+                    | OrderStatus.Expired
+                    | OrderStatus.Stopped ->
+                        return Error (Some order.OrderStatus)
+                    | _ when n < 25 ->
+                        return! loop (n + 1)
+                    | _ ->
+                        return Error None
+            }
+
+        loop 0
+
+    let private placeOrder (order : MarketOrder)  broker =
+        task {
+            try
+                let! posted =
+                    broker.TradingClient.PostOrderAsync(order)
+                match! awaitOrder posted.OrderId broker with
+                    | Ok () -> return Ok ()
+                    | Error statusOpt ->
+                        let msg =
+                            statusOpt
+                                |> Option.map string
+                                |> Option.defaultValue "Unknown"
+                        return Error (exn(msg))
+            with exn ->
+                return Error exn
+        } |> Async.AwaitTask
+
+    let sell asset quantity broker =
+        async {
+            let order =
+                MarketOrder.Sell(
+                    asset.Symbol,
+                    OrderQuantity.Fractional(quantity))
+            return! placeOrder order broker
+        }
+
+    let buy asset (Usd usd) broker =
+        async {
+            let order =
+                MarketOrder.Buy(
+                    asset.Symbol,
+                    OrderQuantity.Notional(usd))
+            return! placeOrder order broker
+        }

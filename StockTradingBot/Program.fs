@@ -49,11 +49,21 @@ module Program =
                 | Error (asset : Asset, exn : exn) ->
                     printfn $"Asset error: {asset}: {exn.Message}"
 
-    let runOverview portfolioAssets marketOverview =
+    let placeOrders portfolio recommendations =
+        let sells, buys =
+            recommendations
+                |> Array.partition (fun reco ->
+                    match reco.Action with
+                        | AssetAction.Sell -> true
+                        | AssetAction.Buy -> false
+                        | _ -> failwith "Unexpected")
+        ()
+
+    let runOverview portfolio marketOverview =
         async {
                 // all assets in portfolio are candidates
             let portfolioCandidates =
-                portfolioAssets
+                portfolio.PositionMap.Keys
                     |> Seq.map (fun asset ->
                         Candidate.create asset "In portfolio")
 
@@ -76,6 +86,14 @@ module Program =
             match result with
                 | Success results ->
                     printAssetRecommendations results
+                    let recos =
+                        results
+                            |> Array.choose (function
+                                | Ok reco
+                                    when reco.Action <> AssetAction.Hold ->
+                                    Some reco
+                                | _ -> None)
+                    placeOrders portfolio recos
                 | AgentError exn ->
                     printfn $"Asset recommendation error: {exn.Message}"
         }
@@ -87,7 +105,7 @@ module Program =
                     printPortfolio portfolio
                     match! MarketOverview.getAsync httpClient agent with
                         | MarketOverviewResult.Success overview ->
-                            do! runOverview portfolio.PositionMap.Keys overview
+                            do! runOverview portfolio overview
                         | FeedErrors errors ->
                             for feed, exn in errors do
                                 printfn $"News feed error: {feed.Name}: {exn.Message}"
