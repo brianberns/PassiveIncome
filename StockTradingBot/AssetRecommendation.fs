@@ -132,24 +132,23 @@ module AssetRecommendation =
             dto.Reason
 
     /// Creates recommendations for the given DTOs.
-    let private createRecommendations dtosResult candidates =
-        match dtosResult with
-            | Ok dtos ->
-                let recoMap =
-                    dtos
-                        |> Seq.map (fun dto ->
-                            let reco = ofDto dto
-                            reco.Asset, reco)
-                        |> Map
-                Success [|
-                    for (cand : Candidate) in candidates do
-                        match Map.tryFind cand.Asset recoMap with
-                            | Some reco -> Ok reco
-                            | None ->
-                                Error (cand.Asset, exn("Agent ignored"))
-                |]
-            | Error exn ->
-                AgentError exn
+    let private createRecommendations candidates = function
+        | Ok dtos ->
+            let recoMap =
+                dtos
+                    |> Seq.map (fun dto ->
+                        let reco = ofDto dto
+                        reco.Asset, reco)
+                    |> Map
+            Success [|
+                for (cand : Candidate) in candidates do
+                    match Map.tryFind cand.Asset recoMap with
+                        | Some reco -> Ok reco
+                        | None ->
+                            Error (cand.Asset, exn("Agent ignored"))
+            |]
+        | Error exn ->
+            AgentError exn
 
     /// Determines recommendations for the given candidates.
     let private getRecommendations
@@ -158,7 +157,8 @@ module AssetRecommendation =
             let! dtosResult =
                 getRecommendationDtos
                     agent utcNow marketOverview.Trend candItemArrays
-            return createRecommendations dtosResult marketOverview.Candidates
+            return createRecommendations
+                marketOverview.Candidates dtosResult
         }
 
     /// Determines asset recommendations from the given market
