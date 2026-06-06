@@ -68,6 +68,8 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
+    /// Waits a while (but not forever) for the given order
+    /// to fill.
     let private awaitOrder orderId broker =
 
         let rec loop n =
@@ -76,33 +78,42 @@ module Broker =
                 let! order =
                     broker.TradingClient.GetOrderAsync(orderId : Guid)
                 match order.OrderStatus with
+
+                        // order succeeded
                     | OrderStatus.Filled as status ->
                         match Option.ofNullable order.AverageFillPrice with
                             | Some price ->
                                 return Ok (Usd price)
                             | None ->
-                                return Error (Some status)
+                                return Error (Some status)   // hopefully this can never happen
+
+                        // order failed
                     | OrderStatus.Canceled
                     | OrderStatus.Rejected
                     | OrderStatus.Expired
                     | OrderStatus.Stopped as status ->
                         return Error (Some status)
+
+                        // try again?
                     | _ when n < 25 ->
                         return! loop (n + 1)
+
+                        // give up waiting (e.g. market is closed)
                     | _ ->
                         return Error None
             }
 
         loop 0
 
-    let private placeOrder (order : MarketOrder)  broker =
+    /// Places the given order.
+    let private placeOrder (order : MarketOrder) broker =
         task {
             try
                 let! posted =
                     broker.TradingClient.PostOrderAsync(order)
                 match! awaitOrder posted.OrderId broker with
-                    | Ok totalPrice ->
-                        return Ok totalPrice
+                    | Ok price ->
+                        return Ok price
                     | Error statusOpt ->
                         let msg =
                             statusOpt
@@ -113,6 +124,7 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
+    /// Sells the given quantity of the given asset.
     let sell asset quantity broker =
         async {
             let order =
@@ -122,9 +134,10 @@ module Broker =
             return! placeOrder order broker
         }
 
+    /// Buys the given value of the given asset.
     let buy asset (Usd usd) broker =
         async {
-            let usd = Math.Truncate(usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
+            let usd = truncate (usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
             let order =
                 MarketOrder.Buy(
                     asset.Symbol,
