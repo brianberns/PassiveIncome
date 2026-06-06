@@ -210,6 +210,7 @@ module Broker =
 
     let buy asset (Usd usd) broker =
         async {
+            let usd = (usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
             let order =
                 MarketOrder.Buy(
                     asset.Symbol,
