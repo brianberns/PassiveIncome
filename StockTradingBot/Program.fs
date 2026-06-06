@@ -70,6 +70,8 @@ module Program =
                 sells
 
         async {
+
+                // sell first to generate cash
             let! sellResults =
                 sellQuantities
                     |> Seq.map (fun (asset, quantity) ->
@@ -79,6 +81,21 @@ module Program =
                             return asset, quantity, result
                         })
                     |> Async.Sequential
+
+                // compute spendable cash
+            let totalSales =
+                sellResults
+                    |> Seq.sumBy (fun (_, quantity, result) ->
+                        match result with
+                            | Ok avgPrice -> quantity * avgPrice
+                            | Error _ -> Money.Zero)
+            let cash =
+                let slush = Usd 1m
+                portfolio.TradableCash + totalSales - slush
+
+            if cash > Money.Zero then
+                ()
+
             return sellResults
         }
 
@@ -91,7 +108,8 @@ module Program =
             for asset, quantity, result in sellResults do
                 let msg =
                     match result with
-                        | Ok () -> "Success"
+                        | Ok avgPrice ->
+                            $"{quantity * avgPrice} total"
                         | Error (exn : exn) -> exn.Message
                 printfn $"   Sell {quantity} shares of {asset}: {msg}"
 

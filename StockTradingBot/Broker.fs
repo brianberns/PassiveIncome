@@ -14,6 +14,21 @@ type Money =
     /// U.S. dollars ($).
     | Usd of decimal
 
+    /// Zero.
+    static member Zero = Usd 0m
+
+    /// Addition.
+    static member (+)(Usd a, Usd b) =
+        Usd (a + b)
+
+    /// Subtraction.
+    static member (-)(Usd a, Usd b) =
+        Usd (a - b)
+
+    /// Multiplication.
+    static member (*)(n : decimal, Usd usd) =
+        Usd (n * usd)
+
     /// Display string.
     member money.String =
         let (Usd usd) = money
@@ -143,13 +158,17 @@ module Broker =
                 let! order =
                     broker.TradingClient.GetOrderAsync(orderId : Guid)
                 match order.OrderStatus with
-                    | OrderStatus.Filled ->
-                        return Ok ()
+                    | OrderStatus.Filled as status ->
+                        match Option.ofNullable order.AverageFillPrice with
+                            | Some price ->
+                                return Ok (Usd price)
+                            | None ->
+                                return Error (Some status)
                     | OrderStatus.Canceled
                     | OrderStatus.Rejected
                     | OrderStatus.Expired
-                    | OrderStatus.Stopped ->
-                        return Error (Some order.OrderStatus)
+                    | OrderStatus.Stopped as status ->
+                        return Error (Some status)
                     | _ when n < 25 ->
                         return! loop (n + 1)
                     | _ ->
@@ -164,7 +183,8 @@ module Broker =
                 let! posted =
                     broker.TradingClient.PostOrderAsync(order)
                 match! awaitOrder posted.OrderId broker with
-                    | Ok () -> return Ok ()
+                    | Ok totalPrice ->
+                        return Ok totalPrice
                     | Error statusOpt ->
                         let msg =
                             statusOpt
