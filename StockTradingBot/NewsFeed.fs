@@ -24,11 +24,6 @@ module NewsItemFilter =
         fun item ->
             utcNow - item.PublishDate.UtcDateTime < oneDay
 
-    /// Applies the given filters to the given news items.
-    let applyFilters filters item =
-        Seq.forall (fun (filter : NewsItemFilter) ->
-            filter item) filters
-
 /// News feed (via RSS, for example).
 type NewsFeed =
     {
@@ -63,8 +58,8 @@ module NewsFeed =
                 return Ok [|
                     for item in feed.Items do
                         let keep =
-                            NewsItemFilter.applyFilters
-                                newsFeed.Filters item
+                            Seq.forall (fun filter ->
+                                filter item) newsFeed.Filters
                         if keep then
                             item.SourceFeed <- feed   // ick
                             item
