@@ -23,32 +23,6 @@ module Program =
             .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
         client
 
-    let printPortfolio (portfolio : Portfolio) =
-        printfn "Portfolio"
-        printfn $"   Tradable cash: {portfolio.TradableCash}"
-        for (asset, value) in Map.toSeq portfolio.PositionMap do
-            printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
-
-    let printMarketOverview marketOverview =
-        printfn $"Trend: {marketOverview.Trend}"
-        printfn ""
-        printfn "Candidates:"
-        for candidate in marketOverview.Candidates do
-            printfn ""
-            printfn $"{candidate.Asset.Symbol}"
-            printfn $"{candidate.Reason}"
-
-    let printAssetRecommendations results =
-        printfn "Recommendations:"
-        for result in results do
-            printfn ""
-            match result with
-                | Ok reco ->
-                    printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                    printfn $"{reco.Reason}"
-                | Error (asset : Asset, exn : exn) ->
-                    printfn $"Asset error: {asset}: {exn.Message}"
-
     let placeOrders portfolio recommendations =
 
             // separate sells from buys
@@ -110,11 +84,36 @@ module Program =
                 return sellResults, Array.empty
         }
 
+    let printPortfolio (portfolio : Portfolio) =
+        printfn "Portfolio"
+        printfn $"   Tradable cash: {portfolio.TradableCash}"
+        for (asset, value) in Map.toSeq portfolio.PositionMap do
+            printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
+
+    let printMarketOverview marketOverview =
+        printfn $"Trend: {marketOverview.Trend}"
+        printfn ""
+        printfn "Candidates:"
+        for candidate in marketOverview.Candidates do
+            printfn ""
+            printfn $"{candidate.Asset.Symbol}"
+            printfn $"{candidate.Reason}"
+
+    let printAssetRecommendations results =
+        printfn "Recommendations:"
+        for result in results do
+            printfn ""
+            match result with
+                | Ok reco ->
+                    printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                    printfn $"{reco.Reason}"
+                | Error (asset : Asset, exn : exn) ->
+                    printfn $"Asset error: {asset}: {exn.Message}"
+
     let printAssetResults sellResults buyResults =
         let count =
             Array.length sellResults + Array.length buyResults
         if count > 0 then
-            printfn ""
             printfn "Orders:"
             for asset : Asset, quantity, result in sellResults do
                 let msg =
@@ -146,16 +145,23 @@ module Program =
             match result with
                 | Success results ->
                     printAssetRecommendations results
-                    let recos =
-                        results
-                            |> Array.choose (function
-                                | Ok reco
-                                    when reco.Action <> AssetAction.Hold ->
-                                    Some reco
-                                | _ -> None)
-                    let! sellResults, buyResults =
-                        placeOrders portfolio recos
-                    printAssetResults sellResults buyResults
+
+                    printfn ""
+                    match! Broker.isMarketOpen broker with
+                        | Ok true ->
+                            let recos =
+                                results
+                                    |> Array.choose (function
+                                        | Ok reco
+                                            when reco.Action <> AssetAction.Hold ->
+                                            Some reco
+                                        | _ -> None)
+                            let! sellResults, buyResults =
+                                placeOrders portfolio recos
+                            printAssetResults sellResults buyResults
+                        | Ok false -> printfn "Market is closed"
+                        | Error exn -> printfn $"Market error: {exn.Message}"
+
                 | AgentError exn ->
                     printfn $"Asset recommendation error: {exn.Message}"
         }
