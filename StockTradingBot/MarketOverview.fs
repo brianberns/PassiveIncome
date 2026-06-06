@@ -160,14 +160,17 @@ module MarketOverview =
     /// Determines market overview from the given news items.
     let private getOverview agent utcNow (itemArrays : SyndicationItem[][]) =
         async {
-            let prompt =
-                itemArrays
-                    |> Seq.concat
-                    |> Seq.distinctBy _.Id
-                    |> Seq.sortByDescending _.PublishDate
-                    |> getPrompt utcNow
+                // query agent
             let! dtoResult =
+                let prompt =
+                    itemArrays
+                        |> Seq.concat
+                        |> Seq.distinctBy _.Id
+                        |> Seq.sortByDescending _.PublishDate
+                        |> getPrompt utcNow
                 Agent.getResultAsync<MarketOverviewDto> prompt agent
+
+                // process result
             match dtoResult with
                 | Ok dto -> return Success (ofDto dto)
                 | Error exn ->  return AgentError exn

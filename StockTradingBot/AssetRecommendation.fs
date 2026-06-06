@@ -58,7 +58,7 @@ module AssetRecommendation =
             the current overall market trend."
             ""
             $"Trend: %s{marketTrend}"
-            for (candidate : Candidate, items) in candidateNews do
+            for (candidate : Candidate, items : _[]) in candidateNews do
                 ""
                 "###################"
                 ""
@@ -75,7 +75,8 @@ module AssetRecommendation =
         ]
 
     /// Gets news items for the given candidate asset.
-    let private getCandidateNewsItems httpClient utcNow (candidate : Candidate) =
+    let private getCandidateNewsItems
+        httpClient utcNow (candidate : Candidate) =
         async {
             let! result =
                 getFeed utcNow candidate.Asset
@@ -84,7 +85,7 @@ module AssetRecommendation =
         }
 
     /// Gets news items for the given candidate assets.
-    let getNewsItems httpClient utcNow candidates =
+    let private getNewsItems httpClient utcNow candidates =
         async {
             let! results =
                 candidates
@@ -99,6 +100,17 @@ module AssetRecommendation =
                         | Ok items -> Choice1Of2 (cand, items)
                         | Error error -> Choice2Of2 (cand, error))
         }
+
+    /// Extracts candidate news pairs.
+    let private getCandidateNews candItemArrays =
+        [|
+            for (cand : Candidate), (items : SyndicationItem[]) in candItemArrays do
+                let items =
+                    items
+                        |> Seq.sortByDescending _.PublishDate
+                        |> Seq.toArray
+                cand, items
+        |]
 
     /// Asset recommendation DTO.
     type (*private*) AssetRecommendationDto =
@@ -115,23 +127,18 @@ module AssetRecommendation =
             dto.Action
             dto.Reason
 
+    /// Determines recommendations for the given candidates.
     let private getRecommendations
         agent utcNow marketOverview candItemArrays =
         async {
-            let prompt =
-                let candItemArrays =
-                    [|
-                        for cand, (items : SyndicationItem[]) in candItemArrays do
-                            let items =
-                                items
-                                    |> Seq.sortByDescending _.PublishDate
-                                    |> Seq.toArray
-                            cand, items
-                    |]
-                getPrompt
-                    utcNow marketOverview.Trend candItemArrays
+                // query agent
             let! dtosResult =
+                let prompt =
+                    getCandidateNews candItemArrays
+                        |> getPrompt utcNow marketOverview.Trend
                 Agent.getResultAsync<AssetRecommendationDto[]> prompt agent
+
+                // process result
             match dtosResult with
                 | Ok dtos ->
                     let recoMap =
@@ -147,7 +154,6 @@ module AssetRecommendation =
                                 | None ->
                                     Error (cand.Asset, exn("Agent ignored"))
                     |]
-
                 | Error exn ->
                     return AgentError exn
         }
