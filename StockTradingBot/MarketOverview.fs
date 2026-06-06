@@ -61,27 +61,37 @@ module MarketOverview =
                 |> Array.contains("I")
 
     /// General market news feeds.
-    let private feeds =
+    let private getFeeds utcNow =
         [
             NewsFeed.create
                 "MarketWatch Top Stories"
                 "https://feeds.content.dowjones.io/public/rss/mw_topstories"
                 [
                     NewsItemFilter.hasSummary
+                    NewsItemFilter.isRecent utcNow
                     (isPersonal >> not)   // filter out personal finance stories
                 ]
             NewsFeed.create
                 "CNBC Top News"
                 "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
-                [ NewsItemFilter.hasSummary ]
+                [
+                    NewsItemFilter.hasSummary
+                    NewsItemFilter.isRecent utcNow
+                ]
             NewsFeed.create
                 "CNBC Finance"
                 "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664"
-                [ NewsItemFilter.hasSummary ]
+                [
+                    NewsItemFilter.hasSummary
+                    NewsItemFilter.isRecent utcNow
+                ]
             NewsFeed.create
                 "Yahoo S&P 500"
                 "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US"   // ^GSPC = S&P 500
-                [ NewsItemFilter.hasSummary ]
+                [
+                    NewsItemFilter.hasSummary
+                    NewsItemFilter.isRecent utcNow
+                ]
         ]
 
     /// Creates a prompt for the given news items.
@@ -148,17 +158,12 @@ module MarketOverview =
         }
 
     /// Determines market overview from the given news items.
-    let private getOverview itemArrays agent =
+    let private getOverview agent utcNow (itemArrays : SyndicationItem[][]) =
         async {
             let prompt =
-                let utcNow = DateTime.UtcNow
-                let oneDay = TimeSpan.FromDays(1)
                 itemArrays
                     |> Seq.concat
-                    |> Seq.distinctBy (fun (item : SyndicationItem) ->
-                        item.Id)
-                    |> Seq.where (fun item ->
-                        utcNow - item.PublishDate.UtcDateTime < oneDay)
+                    |> Seq.distinctBy _.Id
                     |> Seq.sortByDescending _.PublishDate
                     |> getPrompt utcNow
             let! dtoResult =
@@ -175,12 +180,13 @@ module MarketOverview =
     let getAsync httpClient agent =
         async {
                 // get news items
+            let utcNow = DateTime.UtcNow
             let! itemArrays, errors =
-                getNewsItems httpClient feeds
+                getNewsItems httpClient (getFeeds utcNow)
 
                 // get overview?
             if errors.Length > 0 then   // to-do: carry on (with limited information) if any of the feeds fail?
                 return FeedErrors errors
             else
-                return! getOverview itemArrays agent
+                return! getOverview agent utcNow itemArrays
         }

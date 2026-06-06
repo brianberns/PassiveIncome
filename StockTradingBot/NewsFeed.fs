@@ -18,6 +18,12 @@ module NewsItemFilter =
                 && not (String.IsNullOrWhiteSpace(
                     item.Summary.Text))
 
+    /// The given item was published in the last day?
+    let isRecent utcNow : NewsItemFilter =
+        let oneDay = TimeSpan.FromDays(1)
+        fun item ->
+            utcNow - item.PublishDate.UtcDateTime < oneDay
+
     /// Applies the given filters to the given news items.
     let applyFilters filters item =
         Seq.forall (fun (filter : NewsItemFilter) ->

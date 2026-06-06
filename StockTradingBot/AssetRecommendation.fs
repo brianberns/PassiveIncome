@@ -41,11 +41,14 @@ module AssetRecommendation =
         }
 
     /// Gets a news feed specific to the given asset.
-    let private getFeed asset =
+    let private getFeed utcNow asset =
         NewsFeed.create
             $"Yahoo {asset.Symbol}"
             $"https://feeds.finance.yahoo.com/rss/2.0/headline?s={asset.Symbol}&region=US&lang=en-US"
-            [ NewsItemFilter.hasSummary ]
+            [
+                NewsItemFilter.hasSummary
+                NewsItemFilter.isRecent utcNow
+            ]
 
     /// Creates a prompt for the given candidate assets.
     let private getPrompt utcNow marketTrend candidateNews =
@@ -72,20 +75,21 @@ module AssetRecommendation =
         ]
 
     /// Gets news items for the given candidate asset.
-    let private getCandidateNewsItems httpClient (candidate : Candidate) =
+    let private getCandidateNewsItems httpClient utcNow (candidate : Candidate) =
         async {
             let! result =
-                getFeed candidate.Asset
+                getFeed utcNow candidate.Asset
                     |> NewsFeed.getItemsAsync httpClient
             return candidate, result
         }
 
     /// Gets news items for the given candidate assets.
-    let getNewsItems httpClient candidates =
+    let getNewsItems httpClient utcNow candidates =
         async {
             let! results =
                 candidates
-                    |> Seq.map (getCandidateNewsItems httpClient)
+                    |> Seq.map (
+                        getCandidateNewsItems httpClient utcNow)
                     |> Async.Parallel
 
                 // handle errors
@@ -111,10 +115,21 @@ module AssetRecommendation =
             dto.Action
             dto.Reason
 
-    let private getRecommendations agent marketOverview candItemArrays =
+    let private getRecommendations
+        agent utcNow marketOverview candItemArrays =
         async {
-            let utcNow = DateTime.UtcNow
-            let prompt = getPrompt utcNow marketOverview.Trend candItemArrays
+            let prompt =
+                let candItemArrays =
+                    [|
+                        for cand, (items : SyndicationItem[]) in candItemArrays do
+                            let items =
+                                items
+                                    |> Seq.sortByDescending _.PublishDate
+                                    |> Seq.toArray
+                            cand, items
+                    |]
+                getPrompt
+                    utcNow marketOverview.Trend candItemArrays
             let! dtosResult =
                 Agent.getResultAsync<AssetRecommendationDto[]> prompt agent
             match dtosResult with
@@ -144,12 +159,15 @@ module AssetRecommendation =
     let getAsync httpClient agent marketOverview : Async<AssetRecommendationResult> =
         async {
                 // get news items
+            let utcNow = DateTime.UtcNow
             let! candItemArrays, candErrors =
-                getNewsItems httpClient marketOverview.Candidates
+                getNewsItems
+                    httpClient utcNow marketOverview.Candidates
 
             for cand, (feed, exn) in candErrors do
                 printfn $"Asset recommendation error: {cand.Asset.Symbol}: {exn.Message}"
 
                 // get recommendations
-            return! getRecommendations agent marketOverview candItemArrays
+            return! getRecommendations
+                agent utcNow marketOverview candItemArrays
         }
