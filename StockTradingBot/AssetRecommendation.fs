@@ -22,6 +22,7 @@ type AssetRecommendation =
         Reason : string
     }
 
+/// Recommendation result for a collection of assets.
 type AssetRecommendationResult =
 
     /// Agent succeeded, but some assets might have a problem.
@@ -132,34 +133,24 @@ module AssetRecommendation =
             dto.Reason
 
     /// Creates recommendations for the given DTOs.
-    let private createRecommendations candidates = function
-        | Ok dtos ->
-            let recoMap =
-                dtos
-                    |> Seq.map (fun dto ->
-                        let reco = ofDto dto
-                        reco.Asset, reco)
-                    |> Map
-            Success [|
-                for (cand : Candidate) in candidates do
-                    match Map.tryFind cand.Asset recoMap with
-                        | Some reco -> Ok reco
-                        | None ->
-                            Error (cand.Asset, exn("Agent ignored"))
-            |]
-        | Error exn ->
-            AgentError exn
+    let private createRecommendations candidates dtos =
 
-    /// Determines recommendations for the given candidates.
-    let private getRecommendations
-        agent utcNow marketOverview candItemArrays =
-        async {
-            let! dtosResult =
-                getRecommendationDtos
-                    agent utcNow marketOverview.Trend candItemArrays
-            return createRecommendations
-                marketOverview.Candidates dtosResult
-        }
+            // map assets to generated recommendations
+        let recoMap =
+            dtos
+                |> Seq.map (fun dto ->
+                    let reco = ofDto dto
+                    reco.Asset, reco)
+                |> Map
+
+            // find recommendation for each candidate, if it exists
+        [|
+            for (cand : Candidate) in candidates do
+                match Map.tryFind cand.Asset recoMap with
+                    | Some reco -> Ok reco
+                    | None ->
+                        Error (cand.Asset, exn("Agent ignored"))
+        |]
 
     /// Determines asset recommendations from the given market
     /// overview:
@@ -173,10 +164,26 @@ module AssetRecommendation =
                 getNewsItems
                     httpClient utcNow marketOverview.Candidates
 
-            for cand, (feed, exn) in candErrors do
-                printfn $"Asset recommendation error: {cand.Asset.Symbol}: {exn.Message}"
+                // news feed errors for some assets don't prevent success for other assets
+            let feedErrorResults =
+                [|
+                    for cand, (_, exn) in candErrors do
+                        Error (cand.Asset, exn)
+                |]
 
                 // get recommendations
-            return! getRecommendations
-                agent utcNow marketOverview candItemArrays
+            let! dtosResult =
+                getRecommendationDtos
+                    agent utcNow marketOverview.Trend candItemArrays
+            match dtosResult with
+                | Ok dtos ->
+                    let successResults =
+                        createRecommendations
+                            marketOverview.Candidates dtos
+                    return Success [|
+                        yield! feedErrorResults
+                        yield! successResults
+                    |]
+                | Error exn ->
+                    return AgentError exn
         }
