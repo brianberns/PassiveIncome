@@ -7,8 +7,11 @@ type Money =
     /// U.S. dollars ($).
     | Usd of decimal
 
-    /// Zero.
+    /// Zero dollars.
     static member Zero = Usd 0m
+
+    /// One dollar.
+    static member One = Usd 1m
 
     /// Addition.
     static member (+)(Usd a, Usd b) =
@@ -21,6 +24,10 @@ type Money =
     /// Multiplication.
     static member (*)(n : decimal, Usd usd) =
         Usd (n * usd)
+
+    /// Multiplication.
+    static member (*)(Usd usd, n : decimal) =
+        Usd (usd * n)
 
     /// Division.
     static member (/)(Usd usd, n : decimal) =
