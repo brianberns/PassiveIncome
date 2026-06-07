@@ -69,7 +69,7 @@ module Broker =
         } |> Async.AwaitTask
 
     /// Waits a while (but not forever) for the given order
-    /// to fill.
+    /// to fill, and then answers its average fill price.
     let private awaitOrder orderId broker =
 
         let rec loop n =

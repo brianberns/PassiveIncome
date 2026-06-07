@@ -8,14 +8,20 @@ open Microsoft.Extensions.Configuration
 
 module Program =
 
+    /// Program configuration.
     let config =
         let assembly = Assembly.GetExecutingAssembly()
         ConfigurationBuilder()
             .AddUserSecrets(assembly)
             .Build()
+
+    /// Decision-making agent.
     let agent = Agent.create config Model.groq
+
+    /// Broker for buying/selling assets.
     let broker = Broker.create config
 
+    /// HTTP client for fetching news feeds.
     let httpClient =
         let client = new HttpClient()
         client.DefaultRequestHeaders
@@ -23,62 +29,76 @@ module Program =
             .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
         client
 
+    /// Separates sell recommendations from buy recommendations.
+    let partition recommendations =
+        recommendations
+            |> Array.partitionWith (fun reco ->
+                match reco.Action with
+                    | AssetAction.Sell -> Choice1Of2 reco.Asset
+                    | AssetAction.Buy -> Choice2Of2 reco.Asset
+                    | _ -> failwith "Unexpected")
+
+    /// Obtains quantity of each of the given assets in the
+    /// given portfolio.
+    let getQuantities portfolio assets =
+        Seq.choose (fun asset ->
+            portfolio.PositionMap
+                |> Map.tryFind asset
+                |> Option.map (fun value ->
+                    asset, value.Quantity))
+            assets
+
+    /// Sells the given asset quantities.
+    let sellAssetQuantities assetQuantities =
+        assetQuantities
+            |> Seq.map (fun (asset, quantity) ->
+                async {
+                    let! result =
+                        Broker.sell asset quantity broker
+                    return asset, quantity, result
+                })
+            |> Async.Sequential   // avoid hammering the broker API
+
+    /// Slush to avoid spending more than we have.
+    let slush = Usd 1m
+
+    /// Gets spendable cash from portfolio and sold assets.
+    let getSpendableCash portfolio sellResults =
+        let totalSales =
+            sellResults
+                |> Seq.sumBy (fun (_, quantity, result) ->
+                    match result with
+                        | Ok (avgPrice : Money) ->
+                            quantity * avgPrice
+                        | Error _ -> Money.Zero)
+        portfolio.TradableCash + totalSales - slush
+
+    /// Buys the given assets using the given cash.
+    let buyAssets (assets : _[]) (cash : Money) =
+        let portion = cash / decimal assets.Length
+        assets
+            |> Seq.map (fun asset ->
+                async {
+                    let! result =
+                        Broker.buy asset portion broker
+                    return asset, portion, result
+                })
+            |> Async.Sequential   // avoid hammering the broker API
+
     let placeOrders portfolio recommendations =
-
-            // separate sells from buys
-        let sells, buys =
-            recommendations
-                |> Array.partitionWith (fun reco ->
-                    match reco.Action with
-                        | AssetAction.Sell -> Choice1Of2 reco.Asset
-                        | AssetAction.Buy -> Choice2Of2 reco.Asset
-                        | _ -> failwith "Unexpected")
-
-            // can only sell assets we own
-        let sellQuantities =
-            Array.choose (fun asset ->
-                portfolio.PositionMap
-                    |> Map.tryFind asset
-                    |> Option.map (fun value ->
-                        asset, value.Quantity))
-                sells
-
         async {
-
-                // sell first to generate cash
+                // sell assets first to generate cash
+            let sells, buys =
+                partition recommendations
             let! sellResults =
-                sellQuantities
-                    |> Seq.map (fun (asset, quantity) ->
-                        async {
-                            let! result =
-                                Broker.sell asset quantity broker
-                            return asset, quantity, result
-                        })
-                    |> Async.Sequential
+                sells
+                    |> getQuantities portfolio   // can only sell assets we own
+                    |> sellAssetQuantities
+            let cash = getSpendableCash portfolio sellResults
 
-                // compute spendable cash
-            let cash =
-                let totalSales =
-                    sellResults
-                        |> Seq.sumBy (fun (_, quantity, result) ->
-                            match result with
-                                | Ok avgPrice -> quantity * avgPrice
-                                | Error _ -> Money.Zero)
-                let slush = Usd 1m
-                portfolio.TradableCash + totalSales - slush
-
-                // buy
-            if cash > Money.Zero then
-                let! buyResults =
-                    let portion = cash / decimal buys.Length
-                    buys
-                        |> Seq.map (fun asset ->
-                            async {
-                                let! result =
-                                    Broker.buy asset portion broker
-                                return asset, portion, result
-                            })
-                        |> Async.Sequential
+                // buy assets with cash on hand
+            if buys.Length > 0 && cash > Money.Zero then
+                let! buyResults = buyAssets buys cash
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
@@ -97,12 +117,6 @@ module Program =
                 |> Seq.map _.Asset.Symbol
                 |> String.concat ", "
         printfn $"Candidates: {candidates}"
-        (*
-        for candidate in marketOverview.Candidates do
-            printfn ""
-            printfn $"{candidate.Asset.Symbol}"
-            printfn $"{candidate.Reason}"
-        *)
 
     let printAssetRecommendations results =
         printfn "Recommendations:"
