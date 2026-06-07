@@ -13,7 +13,7 @@ module Program =
         ConfigurationBuilder()
             .AddUserSecrets(assembly)
             .Build()
-    let agent = Agent.create config Model.gemini
+    let agent = Agent.create config Model.groq
     let broker = Broker.create config
 
     let httpClient =
