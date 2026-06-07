@@ -29,6 +29,25 @@ module Program =
             .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
         client
 
+    /// Gets trade recommendations based on the given market
+    /// overview.
+    let getRecommendations portfolio marketOverview =
+
+        let candidates =
+            let portfolioCandidates =
+                portfolio.PositionMap.Keys
+                    |> Seq.map (fun asset ->
+                        Candidate.create asset "In portfolio")
+            set [
+                yield! portfolioCandidates   // always consider selling assets in portfolio
+                yield! marketOverview.Candidates
+            ]
+
+        AssetRecommendation.getAsync
+            httpClient agent
+            marketOverview.Trend
+            candidates
+
     /// Separates sell recommendations from buy recommendations.
     let partition recommendations =
         recommendations
@@ -85,6 +104,7 @@ module Program =
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
+    /// Places orders based on the given recommendations.
     let placeOrders portfolio recommendations =
         async {
                 // sell assets first to generate cash
@@ -157,19 +177,7 @@ module Program =
             printfn ""
             printMarketOverview marketOverview
             let! result =
-                let candidates =
-                    let portfolioCandidates =
-                        portfolio.PositionMap.Keys
-                            |> Seq.map (fun asset ->
-                                Candidate.create asset "In portfolio")
-                    set [
-                        yield! portfolioCandidates
-                        yield! marketOverview.Candidates
-                    ]
-                AssetRecommendation.getAsync
-                    httpClient agent
-                    marketOverview.Trend
-                    candidates
+                getRecommendations portfolio marketOverview
 
                 // make trades based on recommendations
             printfn ""
