@@ -14,6 +14,7 @@
     <Compile Include="Agent.fs" />
     <Compile Include="MarketOverview.fs" />
     <Compile Include="AssetRecommendation.fs" />
+    <Compile Include="Log.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
