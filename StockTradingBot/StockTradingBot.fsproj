@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Readme.md" />
     <Compile Include="NewsFeed.fs" />
     <Compile Include="Money.fs" />
     <Compile Include="Portfolio.fs" />
@@ -18,6 +19,8 @@
     <Compile Include="Run.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="Alpaca.Markets" Version="7.2.0" />
