@@ -6,6 +6,142 @@ open System.Reflection
 
 open Microsoft.Extensions.Configuration
 
+type SellResult =
+    {
+        /// Asset being sold.
+        Asset : Asset
+
+        /// Number of shares to sell.
+        Quantity : decimal
+
+        /// Result of sale.
+        Result : Result<Money (*avg. fill price*), exn>
+    }
+
+module SellResult =
+
+    let create asset quantity result =
+        {
+            Asset = asset
+            Quantity = quantity
+            Result = result
+        }
+
+type BuyResult =
+    {
+        /// Asset being bought.
+        Asset : Asset
+
+        /// Result of purchase.
+        Result : Result<Money (*avg. fill price*), exn>
+    }
+
+module BuyResult =
+
+    let create asset result =
+        {
+            Asset = asset
+            Result = result
+        }
+
+type RunResult =
+    {
+        PortfolioResultOpt : Option<Result<Portfolio, exn>>
+        MarketOverviewResultOpt : Option<MarketOverviewResult>
+        RecommendationResultOpt : Option<AssetRecommendationResult>
+        SellResults : SellResult[]
+        BuyResults : BuyResult[]
+    }
+
+module RunResult =
+
+    let create
+        portfolioResultOpt
+        marketOverviewResultOpt
+        recommendationResultOpt
+        sellResults
+        buyResults =
+        {
+            PortfolioResultOpt = portfolioResultOpt
+            MarketOverviewResultOpt = marketOverviewResultOpt
+            RecommendationResultOpt = recommendationResultOpt
+            SellResults = sellResults
+            BuyResults = buyResults
+        }
+
+module Print =
+
+    let private printPortfolio result =
+        printfn ""
+        printfn "Portfolio:"
+        match result with
+            | Ok portfolio ->
+                printfn $"   Tradable cash: {portfolio.TradableCash}"
+                for (asset, value) in Map.toSeq portfolio.PositionMap do
+                    printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
+            | Error (exn : exn) ->
+                printfn $"   Error: {exn.Message}"
+
+    let private printMarketOverview result =
+        printfn ""
+        printfn "Market overview:"
+        match result with
+            | MarketOverviewResult.Success overview ->
+                printfn $"Trend: {overview.Trend}"
+                let candidates =
+                    overview.Candidates
+                        |> Seq.map _.Asset.Symbol
+                        |> String.concat ", "
+                printfn $"Candidates: {candidates}"
+            | FeedErrors errors ->
+                for feed, exn in errors do
+                    printfn $"News feed error: {feed.Name}: {exn.Message}"
+            | MarketOverviewResult.AgentError exn ->
+                printfn $"Agent error: {exn.Message}"
+
+    let private printAssetRecommendations result =
+        printfn ""
+        printfn "Recommendations:"
+        match result with
+            | AssetRecommendationResult.Success results ->
+                for result in results do
+                    match result with
+                        | Ok reco ->
+                            if reco.Action <> AssetAction.Hold then
+                                printfn ""
+                                printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                                printfn $"{reco.Reason}"
+                        | Error (asset : Asset, exn : exn) ->
+                            printfn ""
+                            printfn $"Asset error: {asset}: {exn.Message}"
+            | AssetRecommendationResult.AgentError exn ->
+                printfn $"Agent error: {exn.Message}"
+
+    let private printAssetResults sellResults buyResults =
+        let count =
+            Array.length sellResults + Array.length buyResults
+        if count > 0 then
+            printfn "Orders:"
+            for asset : Asset, quantity, result in sellResults do
+                let msg =
+                    match result with
+                        | Ok avgPrice ->
+                            $"{quantity * avgPrice} total"
+                        | Error (exn : exn) -> exn.Message
+                printfn $"   Sell {quantity} shares of {asset}: {msg}"
+            for asset : Asset, totalPrice : Money, result in buyResults do
+                let msg =
+                    match result with
+                        | Ok _ ->
+                            $"{totalPrice} total"
+                        | Error (exn : exn) -> exn.Message
+                printfn $"   Buy {asset}: {msg}"
+
+    let printRun runResult =
+        Option.iter printPortfolio runResult.PortfolioResultOpt
+        Option.iter printMarketOverview runResult.MarketOverviewResultOpt
+        Option.iter printAssetRecommendations runResult.RecommendationResultOpt
+
 module Program =
 
     /// Program configuration.
@@ -76,7 +212,8 @@ module Program =
                 async {
                     let! result =
                         Broker.sell asset quantity broker
-                    return asset, quantity, result
+                    return SellResult.create
+                        asset quantity result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -87,10 +224,10 @@ module Program =
     let getSpendableCash portfolio sellResults =
         let totalSales =
             sellResults
-                |> Seq.sumBy (fun (_, quantity, result) ->
-                    match result with
+                |> Seq.sumBy (fun (result : SellResult) ->
+                    match result.Result with
                         | Ok (avgPrice : Money) ->
-                            quantity * avgPrice
+                            result.Quantity * avgPrice
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
@@ -102,7 +239,7 @@ module Program =
                 async {
                     let! result =
                         Broker.buy asset portion broker
-                    return asset, portion, result
+                    return BuyResult.create asset result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -126,100 +263,61 @@ module Program =
                 return sellResults, Array.empty
         }
 
-    let printPortfolio (portfolio : Portfolio) =
-        printfn "Portfolio:"
-        printfn $"   Tradable cash: {portfolio.TradableCash}"
-        for (asset, value) in Map.toSeq portfolio.PositionMap do
-            printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
-
-    let printMarketOverview marketOverview =
-        printfn $"Trend: {marketOverview.Trend}"
-        let candidates =
-            marketOverview.Candidates
-                |> Seq.map _.Asset.Symbol
-                |> String.concat ", "
-        printfn $"Candidates: {candidates}"
-
-    let printAssetRecommendations results =
-        printfn "Recommendations:"
-        for result in results do
-            match result with
-                | Ok reco ->
-                    if reco.Action <> AssetAction.Hold then
-                        printfn ""
-                        printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                        printfn $"{reco.Reason}"
-                | Error (asset : Asset, exn : exn) ->
-                    printfn ""
-                    printfn $"Asset error: {asset}: {exn.Message}"
-
-    let printAssetResults sellResults buyResults =
-        let count =
-            Array.length sellResults + Array.length buyResults
-        if count > 0 then
-            printfn "Orders:"
-            for asset : Asset, quantity, result in sellResults do
-                let msg =
-                    match result with
-                        | Ok avgPrice ->
-                            $"{quantity * avgPrice} total"
-                        | Error (exn : exn) -> exn.Message
-                printfn $"   Sell {quantity} shares of {asset}: {msg}"
-            for asset : Asset, totalPrice : Money, result in buyResults do
-                let msg =
-                    match result with
-                        | Ok _ ->
-                            $"{totalPrice} total"
-                        | Error (exn : exn) -> exn.Message
-                printfn $"   Buy {asset}: {msg}"
-
     let runOverview portfolio marketOverview =
         async {
                 // get asset recommendations for all candidates
-            printfn ""
-            printMarketOverview marketOverview
-            let! result =
+            let! recoResult =
                 getRecommendations portfolio marketOverview
 
                 // make trades based on recommendations
-            printfn ""
-            match result with
-                | Success recoResults ->
-                    printAssetRecommendations recoResults
-
-                    printfn ""
+            match recoResult with
+                | Success recoDetailResults ->
                     match! Broker.isMarketOpen broker with
                         | Ok true ->
                             let! sellResults, buyResults =
-                                recoResults
+                                recoDetailResults
                                     |> Array.choose (function
                                         | Ok reco -> Some reco
                                         | _ -> None)
                                     |> placeOrders portfolio
-                            printAssetResults sellResults buyResults
-                        | Ok false -> printfn "Market is closed"
-                        | Error exn -> printfn $"Market error: {exn.Message}"
-
-                | AgentError exn ->
-                    printfn $"Asset recommendation error: {exn.Message}"
+                            return recoResult, sellResults, buyResults
+                        | _ ->
+                            return recoResult, Array.empty, Array.empty
+                | AgentError _ ->
+                    return recoResult, Array.empty, Array.empty
         }
 
     let run () =
         async {
             match! Broker.getPortfolio broker with
                 | Ok portfolio ->
-                    printPortfolio portfolio
-                    match! MarketOverview.getAsync httpClient agent with
+                    let! marketOverviewResult =
+                        MarketOverview.getAsync httpClient agent
+                    match marketOverviewResult with
                         | MarketOverviewResult.Success overview ->
-                            do! runOverview portfolio overview
-                        | FeedErrors errors ->
-                            for feed, exn in errors do
-                                printfn $"News feed error: {feed.Name}: {exn.Message}"
-                        | MarketOverviewResult.AgentError exn ->
-                            printfn $"Market overview error: {exn.Message}"
+                            let! recoResult, sellResults, buyResults =
+                                runOverview portfolio overview
+                            return RunResult.create
+                                (Some (Ok portfolio))
+                                (Some marketOverviewResult)
+                                (Some recoResult)
+                                sellResults
+                                buyResults
+                        | _ ->
+                            return RunResult.create
+                                (Some (Ok portfolio))
+                                (Some marketOverviewResult)
+                                None
+                                Array.empty
+                                Array.empty
                 | Error exn ->
-                    printfn $"Portfolio error: {exn.Message}"
+                    return RunResult.create
+                        (Some (Error exn))
+                        None
+                        None
+                        Array.empty
+                        Array.empty
         } |> Async.RunSynchronously
 
     Console.OutputEncoding <- Text.Encoding.UTF8
-    run ()
+    run () |> Print.printRun
