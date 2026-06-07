@@ -145,6 +145,10 @@ module Print =
             printfn "   None"
 
     let printRun runResult =
+        printfn ""
+        printfn "-----------------------------------------"
+        printfn ""
+        printfn $"{DateTime.Now}"
         Option.iter printPortfolio runResult.PortfolioResultOpt
         Option.iter printMarketOverview runResult.MarketOverviewResultOpt
         Option.iter printAssetRecommendations runResult.RecommendationResultOpt
