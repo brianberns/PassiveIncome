@@ -296,7 +296,7 @@ module Program =
                     return recoResult, Array.empty, Array.empty
         }
 
-    let run () =
+    let runCycle () =
         async {
             match! Broker.getPortfolio broker with
                 | Ok portfolio ->
@@ -326,7 +326,15 @@ module Program =
                         None
                         Array.empty
                         Array.empty
-        } |> Async.RunSynchronously
+        }
+
+    let rec runLoop () =
+        async {
+            let! runResult = runCycle ()
+            Print.printRun runResult
+            do! Async.Sleep(TimeSpan.FromHours(1))
+            do! runLoop ()
+        }
 
     Console.OutputEncoding <- Text.Encoding.UTF8
-    run () |> Print.printRun
+    runLoop () |> Async.RunSynchronously
