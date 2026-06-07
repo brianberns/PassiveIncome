@@ -51,6 +51,8 @@ module Program =
     /// Separates sell recommendations from buy recommendations.
     let partition recommendations =
         recommendations
+            |> Array.where (fun reco ->
+                reco.Action <> AssetAction.Hold)
             |> Array.partitionWith (fun reco ->
                 match reco.Action with
                     | AssetAction.Sell -> Choice1Of2 reco.Asset
@@ -182,21 +184,18 @@ module Program =
                 // make trades based on recommendations
             printfn ""
             match result with
-                | Success results ->
-                    printAssetRecommendations results
+                | Success recoResults ->
+                    printAssetRecommendations recoResults
 
                     printfn ""
                     match! Broker.isMarketOpen broker with
                         | Ok true ->
-                            let recos =
-                                results
-                                    |> Array.choose (function
-                                        | Ok reco
-                                            when reco.Action <> AssetAction.Hold ->
-                                            Some reco
-                                        | _ -> None)
                             let! sellResults, buyResults =
-                                placeOrders portfolio recos
+                                recoResults
+                                    |> Array.choose (function
+                                        | Ok reco -> Some reco
+                                        | _ -> None)
+                                    |> placeOrders portfolio
                             printAssetResults sellResults buyResults
                         | Ok false -> printfn "Market is closed"
                         | Error exn -> printfn $"Market error: {exn.Message}"
