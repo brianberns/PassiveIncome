@@ -73,6 +73,19 @@ module RunResult =
             BuyResults = buyResults
         }
 
+    let createWithoutRecommendation
+        portfolioResultOpt
+        marketOverviewResultOpt =
+        create
+            portfolioResultOpt
+            marketOverviewResultOpt
+            None Array.empty Array.empty
+
+    let createWithoutOverview portfolioResultOpt =
+        createWithoutRecommendation
+            portfolioResultOpt
+            None
+
 module Print =
 
     let private printPortfolio result =
@@ -164,7 +177,7 @@ module Program =
             .Build()
 
     /// Decision-making agent.
-    let agent = Agent.create config Model.groq
+    let agent = Agent.create config Model.gemini
 
     /// Broker for buying/selling assets.
     let broker = Broker.create config
@@ -296,7 +309,7 @@ module Program =
                     return recoResult, Array.empty, Array.empty
         }
 
-    let runCycle () =
+    let runOne () =
         async {
             match! Broker.isMarketOpen broker with
                 | Ok true ->
@@ -315,38 +328,23 @@ module Program =
                                         sellResults
                                         buyResults
                                 | _ ->
-                                    return RunResult.create
+                                    return RunResult.createWithoutRecommendation
                                         (Some (Ok portfolio))
                                         (Some marketOverviewResult)
-                                        None
-                                        Array.empty
-                                        Array.empty
                         | Error exn ->
-                            return RunResult.create
+                            return RunResult.createWithoutOverview
                                 (Some (Error exn))
-                                None
-                                None
-                                Array.empty
-                                Array.empty
                 | Ok false ->
-                    return RunResult.create
+                    return RunResult.createWithoutOverview
                         None
-                        None
-                        None
-                        Array.empty
-                        Array.empty
                 | Error exn ->
-                    return RunResult.create
+                    return RunResult.createWithoutOverview
                         (Some (Error exn))
-                        None
-                        None
-                        Array.empty
-                        Array.empty
         }
 
     let rec runLoop () =
         async {
-            let! runResult = runCycle ()
+            let! runResult = runOne ()
             Print.printRun runResult
             do! Async.Sleep(TimeSpan.FromHours(1))
             do! runLoop ()
