@@ -15,6 +15,7 @@
     <Compile Include="MarketOverview.fs" />
     <Compile Include="AssetRecommendation.fs" />
     <Compile Include="Log.fs" />
+    <Compile Include="Run.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

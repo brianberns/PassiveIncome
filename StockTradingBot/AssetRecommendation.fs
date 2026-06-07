@@ -140,7 +140,7 @@ module AssetRecommendation =
     /// overview:
     ///    1. Fetches news items specific to the candidate assets.
     ///    2. Asks agent to recommend an action for each asset.
-    let getAsync httpClient agent marketTrend candidates =
+    let getAsync agent httpClient marketTrend candidates =
         async {
                 // get news items
             let utcNow = DateTime.UtcNow
