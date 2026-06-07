@@ -40,7 +40,7 @@ module Model =
     /// Groq.
     let groq =
         {
-            Id = "llama-3.3-70b-versatile"
+            Id = "qwen/qwen3-32b"
             ApiKeyName = "Groq:ApiKey"
             Endpoint = "https://api.groq.com/openai/v1"
             SupportsJsonSchema = false
