@@ -32,15 +32,19 @@ type BuyResult =
         /// Asset being bought.
         Asset : Asset
 
+        /// Amount to spend.
+        Spend : Money
+
         /// Result of purchase.
         Result : Result<Money (*avg. fill price*), exn>
     }
 
 module BuyResult =
 
-    let create asset result =
+    let create asset spend result =
         {
             Asset = asset
+            Spend = spend
             Result = result
         }
 
@@ -118,29 +122,33 @@ module Print =
                 printfn $"Agent error: {exn.Message}"
 
     let private printAssetResults sellResults buyResults =
+        printfn ""
+        printfn "Orders:"
         let count =
             Array.length sellResults + Array.length buyResults
         if count > 0 then
-            printfn "Orders:"
-            for asset : Asset, quantity, result in sellResults do
+            for (sellResult : SellResult) in sellResults do
                 let msg =
-                    match result with
+                    match sellResult.Result with
                         | Ok avgPrice ->
-                            $"{quantity * avgPrice} total"
-                        | Error (exn : exn) -> exn.Message
-                printfn $"   Sell {quantity} shares of {asset}: {msg}"
-            for asset : Asset, totalPrice : Money, result in buyResults do
+                            $"{sellResult.Quantity * avgPrice} total"
+                        | Error exn -> exn.Message
+                printfn $"   Sell {sellResult.Quantity} shares of {sellResult.Asset}: {msg}"
+            for (buyResult : BuyResult) in buyResults do
                 let msg =
-                    match result with
+                    match buyResult.Result with
                         | Ok _ ->
-                            $"{totalPrice} total"
-                        | Error (exn : exn) -> exn.Message
-                printfn $"   Buy {asset}: {msg}"
+                            $"{buyResult.Spend} total"
+                        | Error exn -> exn.Message
+                printfn $"   Buy {buyResult}: {msg}"
+        else
+            printfn "   None"
 
     let printRun runResult =
         Option.iter printPortfolio runResult.PortfolioResultOpt
         Option.iter printMarketOverview runResult.MarketOverviewResultOpt
         Option.iter printAssetRecommendations runResult.RecommendationResultOpt
+        printAssetResults runResult.SellResults runResult.BuyResults
 
 module Program =
 
@@ -233,13 +241,14 @@ module Program =
 
     /// Buys the given assets using the given cash.
     let buyAssets (assets : _[]) (cash : Money) =
-        let portion = cash / decimal assets.Length
+        let portion = cash / decimal assets.Length   // amount to spend on each asset
         assets
             |> Seq.map (fun asset ->
                 async {
                     let! result =
                         Broker.buy asset portion broker
-                    return BuyResult.create asset result
+                    return BuyResult.create
+                        asset portion result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
