@@ -151,7 +151,7 @@ module MarketOverview =
     ///    1. Fetches general news items from feeds.
     ///    2. Asks agent to identify overall market trend and
     ///       candidate assets from those news items.
-    let getAsync agent httpClient =
+    let getAsync httpClient agent =
         async {
                 // get news items
             let utcNow = DateTime.UtcNow

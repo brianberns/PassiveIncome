@@ -3,20 +3,27 @@
 open System
 open System.Net.Http
 
+/// Context need to run.
 type RunContext =
     {
-        Agent : Agent
-        Broker : Broker
+        /// HTTP client for fetching news feeds.
         HttpClient : HttpClient
+
+        /// Decision-making agent.
+        Agent : Agent
+
+        /// Broker for buying/selling assets.
+        Broker : Broker
     }
 
 module RunContext =
 
-    let create agent broker httpClient =
+    /// Creates a run context.
+    let create httpClient agent broker =
         {
+            HttpClient = httpClient
             Agent = agent
             Broker = broker
-            HttpClient = httpClient
         }
 
 module Run =
@@ -36,8 +43,8 @@ module Run =
             ]
 
         AssetRecommendation.getAsync
-            context.Agent
             context.HttpClient
+            context.Agent
             marketOverview.Trend
             candidates
 
@@ -150,8 +157,8 @@ module Run =
                         | Ok portfolio ->
                             let! marketOverviewResult =
                                 MarketOverview.getAsync
-                                    context.Agent
                                     context.HttpClient
+                                    context.Agent
                             match marketOverviewResult with
                                 | MarketOverviewResult.Success overview ->
                                     let! recoResult, sellResults, buyResults =

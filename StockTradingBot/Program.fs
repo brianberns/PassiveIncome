@@ -11,6 +11,14 @@ module Program =
     /// Run context.
     let context =
 
+        /// HTTP client for fetching news feeds.
+        let httpClient =
+            let client = new HttpClient()
+            client.DefaultRequestHeaders
+                .UserAgent
+                .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
+            client
+
         /// Program configuration.
         let config =
             let assembly = Assembly.GetExecutingAssembly()
@@ -24,15 +32,7 @@ module Program =
         /// Broker for buying/selling assets.
         let broker = Broker.create config
 
-        /// HTTP client for fetching news feeds.
-        let httpClient =
-            let client = new HttpClient()
-            client.DefaultRequestHeaders
-                .UserAgent
-                .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
-            client
-
-        RunContext.create agent broker httpClient
+        RunContext.create httpClient agent broker
 
     do
         Console.OutputEncoding <- Text.Encoding.UTF8
