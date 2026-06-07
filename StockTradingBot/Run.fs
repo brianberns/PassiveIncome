@@ -3,6 +3,15 @@
 open System
 open System.Net.Http
 
+(*
+ * Steps in a run:
+ *    1. Check if market is open.
+ *    2. Get current portfolio.
+ *    3. Get market overview.
+ *    4. Create recommendations from market overview.
+ *    5. Place trades based on those recommendations.
+ *)
+
 /// Context need to run.
 type RunContext =
     {
@@ -30,7 +39,7 @@ module Run =
 
     /// Gets trade recommendations based on the given market
     /// overview.
-    let getRecommendations context portfolio marketOverview =
+    let private getRecommendations context portfolio marketOverview =
 
         let candidates =
             let portfolioCandidates =
@@ -49,7 +58,7 @@ module Run =
             candidates
 
     /// Separates sell recommendations from buy recommendations.
-    let partition recommendations =
+    let private partition recommendations =
         recommendations
             |> Array.where (fun reco ->
                 reco.Action <> AssetAction.Hold)
@@ -61,7 +70,7 @@ module Run =
 
     /// Obtains quantity of each of the given assets in the
     /// given portfolio.
-    let getQuantities portfolio assets =
+    let private getQuantities portfolio assets =
         Seq.choose (fun asset ->
             portfolio.PositionMap
                 |> Map.tryFind asset
@@ -70,7 +79,7 @@ module Run =
             assets
 
     /// Sells the given asset quantities.
-    let sellAssetQuantities broker assetQuantities =
+    let private sellAssetQuantities broker assetQuantities =
         assetQuantities
             |> Seq.map (fun (asset, quantity) ->
                 async {
@@ -82,10 +91,10 @@ module Run =
             |> Async.Sequential   // avoid hammering the broker API
 
     /// Slush to avoid spending more than we have.
-    let slush = Usd 1m
+    let private slush = Usd 1m
 
     /// Gets spendable cash from portfolio and sold assets.
-    let getSpendableCash portfolio sellResults =
+    let private getSpendableCash portfolio sellResults =
         let totalSales =
             sellResults
                 |> Seq.sumBy (fun (result : SellResult) ->
@@ -96,7 +105,7 @@ module Run =
         portfolio.TradableCash + totalSales - slush
 
     /// Buys the given assets using the given cash.
-    let buyAssets broker (assets : _[]) (cash : Money) =
+    let private buyAssets broker (assets : _[]) (cash : Money) =
         let portion = cash / decimal assets.Length   // amount to spend on each asset
         assets
             |> Seq.map (fun asset ->
@@ -109,7 +118,7 @@ module Run =
             |> Async.Sequential   // avoid hammering the broker API
 
     /// Places orders based on the given recommendations.
-    let placeOrders broker portfolio recommendations =
+    let private placeOrders broker portfolio recommendations =
         async {
                 // sell assets first to generate cash
             let sells, buys =
@@ -128,6 +137,8 @@ module Run =
                 return sellResults, Array.empty
         }
 
+    /// Acts on recommendations generated from the given market
+    /// overview.
     let runOverview
         context portfolio marketOverview =
         async {
@@ -149,6 +160,7 @@ module Run =
                     return recoResult, Array.empty, Array.empty
         }
 
+    /// Runs once using the given context.
     let runOne context =
         async {
             match! Broker.isMarketOpen context.Broker with
@@ -184,13 +196,16 @@ module Run =
                         (Some (Error exn))
         }
 
+    /// Runs in an infinite loop using the given context.
     let runLoop context =
+
+        let delay = TimeSpan.FromHours(1)
 
         let rec loop () =
             async {
                 let! runResult = runOne context
                 Log.logRun runResult
-                do! Async.Sleep(TimeSpan.FromHours(1))
+                do! Async.Sleep(delay)
                 do! loop ()
             }
 
