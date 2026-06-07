@@ -285,44 +285,56 @@ module Program =
                 // make trades based on recommendations
             match recoResult with
                 | Success recoDetailResults ->
-                    match! Broker.isMarketOpen broker with
-                        | Ok true ->
-                            let! sellResults, buyResults =
-                                recoDetailResults
-                                    |> Array.choose (function
-                                        | Ok reco -> Some reco
-                                        | _ -> None)
-                                    |> placeOrders portfolio
-                            return recoResult, sellResults, buyResults
-                        | _ ->
-                            return recoResult, Array.empty, Array.empty
+                    let! sellResults, buyResults =
+                        recoDetailResults
+                            |> Array.choose (function
+                                | Ok reco -> Some reco
+                                | _ -> None)
+                            |> placeOrders portfolio
+                    return recoResult, sellResults, buyResults
                 | AgentError _ ->
                     return recoResult, Array.empty, Array.empty
         }
 
     let runCycle () =
         async {
-            match! Broker.getPortfolio broker with
-                | Ok portfolio ->
-                    let! marketOverviewResult =
-                        MarketOverview.getAsync httpClient agent
-                    match marketOverviewResult with
-                        | MarketOverviewResult.Success overview ->
-                            let! recoResult, sellResults, buyResults =
-                                runOverview portfolio overview
+            match! Broker.isMarketOpen broker with
+                | Ok true ->
+                    match! Broker.getPortfolio broker with
+                        | Ok portfolio ->
+                            let! marketOverviewResult =
+                                MarketOverview.getAsync httpClient agent
+                            match marketOverviewResult with
+                                | MarketOverviewResult.Success overview ->
+                                    let! recoResult, sellResults, buyResults =
+                                        runOverview portfolio overview
+                                    return RunResult.create
+                                        (Some (Ok portfolio))
+                                        (Some marketOverviewResult)
+                                        (Some recoResult)
+                                        sellResults
+                                        buyResults
+                                | _ ->
+                                    return RunResult.create
+                                        (Some (Ok portfolio))
+                                        (Some marketOverviewResult)
+                                        None
+                                        Array.empty
+                                        Array.empty
+                        | Error exn ->
                             return RunResult.create
-                                (Some (Ok portfolio))
-                                (Some marketOverviewResult)
-                                (Some recoResult)
-                                sellResults
-                                buyResults
-                        | _ ->
-                            return RunResult.create
-                                (Some (Ok portfolio))
-                                (Some marketOverviewResult)
+                                (Some (Error exn))
+                                None
                                 None
                                 Array.empty
                                 Array.empty
+                | Ok false ->
+                    return RunResult.create
+                        None
+                        None
+                        None
+                        Array.empty
+                        Array.empty
                 | Error exn ->
                     return RunResult.create
                         (Some (Error exn))
