@@ -85,8 +85,7 @@ module Run =
                 async {
                     let! result =
                         Broker.sell asset quantity broker
-                    return SellResult.create
-                        asset quantity result
+                    return OrderResult.create asset result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -97,10 +96,10 @@ module Run =
     let private getSpendableCash portfolio sellResults =
         let totalSales =
             sellResults
-                |> Seq.sumBy (fun (result : SellResult) ->
+                |> Seq.sumBy (fun (result : OrderResult) ->
                     match result.Result with
-                        | Ok (avgPrice : Money) ->
-                            result.Quantity * avgPrice
+                        | Ok (avgPrice, quantity) ->
+                            quantity * avgPrice
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
@@ -112,8 +111,7 @@ module Run =
                 async {
                     let! result =
                         Broker.buy asset portion broker
-                    return BuyResult.create
-                        asset portion result
+                    return OrderResult.create asset result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 

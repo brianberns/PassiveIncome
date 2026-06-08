@@ -2,49 +2,26 @@
 
 open System
 
-/// Result of selling an asset.
-type SellResult =
+/// Result of placing an order.
+type OrderResult =
     {
-        /// Asset being sold.
+        /// Asset traded.
         Asset : Asset
 
-        /// Number of shares to sell.
-        Quantity : decimal
-
-        /// Result of sale.
-        Result : Result<Money (*avg. fill price*), exn>
+        /// Result of trade.
+        Result :
+            Result<
+                Money (*avg. fill price*)
+                    * decimal (*filled quantity*),
+                exn>
     }
 
-module SellResult =
+module OrderResult =
 
-    /// Creates a sell result.
-    let create asset quantity result =
+    /// Creates an order result.
+    let create asset result =
         {
             Asset = asset
-            Quantity = quantity
-            Result = result
-        }
-
-/// Result of buying an asset.
-type BuyResult =
-    {
-        /// Asset being bought.
-        Asset : Asset
-
-        /// Amount to spend.
-        Spend : Money
-
-        /// Result of purchase.
-        Result : Result<Money (*avg. fill price*), exn>
-    }
-
-module BuyResult =
-
-    /// Creates a buy result.
-    let create asset spend result =
-        {
-            Asset = asset
-            Spend = spend
             Result = result
         }
 
@@ -61,10 +38,10 @@ type RunResult =
         RecommendationResultOpt : Option<AssetRecommendationResult>
 
         /// Sell results.
-        SellResults : SellResult[]
+        SellResults : OrderResult[]
 
         /// Buy results.
-        BuyResults : BuyResult[]
+        BuyResults : OrderResult[]
     }
 
 module RunResult =
@@ -157,20 +134,20 @@ module Log =
         let count =
             Array.length sellResults + Array.length buyResults
         if count > 0 then
-            for (sellResult : SellResult) in sellResults do
-                let msg =
-                    match sellResult.Result with
-                        | Ok avgPrice ->
-                            $"{sellResult.Quantity * avgPrice} total"
-                        | Error exn -> exn.Message
-                printfn $"   Sell {sellResult.Quantity} shares of {sellResult.Asset}: {msg}"
-            for (buyResult : BuyResult) in buyResults do
-                let msg =
-                    match buyResult.Result with
-                        | Ok _ ->
-                            $"{buyResult.Spend} total"
-                        | Error exn -> exn.Message
-                printfn $"   Buy {buyResult.Asset}: {msg}"
+            for (sellResult : OrderResult) in sellResults do
+                match sellResult.Result with
+                    | Ok (avgPrice, quantity) ->
+                        printfn $"   Sold {quantity} shares of {sellResult.Asset} \
+                            @ {avgPrice}: {quantity * avgPrice} total"
+                    | Error exn ->
+                        printfn $"Sell error {exn.Message}"
+            for (buyResult : OrderResult) in buyResults do
+                match buyResult.Result with
+                    | Ok (avgPrice, quantity) ->
+                        printfn $"   Bought {quantity} shares of {buyResult.Asset} \
+                            @ {avgPrice}: {quantity * avgPrice} total"
+                    | Error exn ->
+                        printfn $"Buy error {exn.Message}"
         else
             printfn "   None"
 

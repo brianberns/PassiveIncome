@@ -69,7 +69,8 @@ module Broker =
         } |> Async.AwaitTask
 
     /// Waits a while (but not forever) for the given order
-    /// to fill, and then answers its average fill price.
+    /// to fill, and then answers its average fill price
+    /// and filled quantity.
     let private awaitOrder orderId broker =
 
         let rec loop n =
@@ -83,7 +84,8 @@ module Broker =
                     | OrderStatus.Filled as status ->
                         match Option.ofNullable order.AverageFillPrice with
                             | Some price ->
-                                return Ok (Usd price)
+                                return Ok (
+                                    Usd price, order.FilledQuantity)
                             | None ->
                                 return Error (Some status)   // hopefully this can never happen
 
