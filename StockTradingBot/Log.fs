@@ -170,7 +170,7 @@ module Log =
                         | Ok _ ->
                             $"{buyResult.Spend} total"
                         | Error exn -> exn.Message
-                printfn $"   Buy {buyResult}: {msg}"
+                printfn $"   Buy {buyResult.Asset}: {msg}"
         else
             printfn "   None"
 
