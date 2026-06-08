@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="StockTradingBot/StockTradingBot.fsproj" Id="7a9354be-d80c-491a-bbda-b8018a23d836" />
-  <Project Path="TradingBot/TradingBot.fsproj" />
 </Solution>
