@@ -119,8 +119,7 @@ module Run =
     let private placeOrders broker portfolio recommendations =
         async {
                 // sell assets first to generate cash
-            let sells, buys =
-                partition recommendations
+            let sells, buys = partition recommendations
             let! sellResults =
                 sells
                     |> getQuantities portfolio   // can only sell assets we own
@@ -128,7 +127,7 @@ module Run =
             let cash = getSpendableCash portfolio sellResults
 
                 // buy assets with cash on hand
-            if buys.Length > 0 && cash > Money.Zero then
+            if buys.Length > 0 && cash > slush then   // don't try to spend a trivial amount
                 let! buyResults = buyAssets broker buys cash
                 return sellResults, buyResults
             else
