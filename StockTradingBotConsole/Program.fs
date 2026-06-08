@@ -2,7 +2,6 @@
 
 open System
 open System.Net.Http
-open System.Reflection
 
 open Microsoft.Extensions.Configuration
 
@@ -23,9 +22,8 @@ module Program =
 
         /// Program configuration.
         let config =
-            let assembly = Assembly.GetExecutingAssembly()
             ConfigurationBuilder()
-                .AddUserSecrets(assembly)
+                .AddUserSecrets(typeof<RunContext>.Assembly)
                 .Build()
 
         /// Decision-making agent.
