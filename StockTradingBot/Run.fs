@@ -139,7 +139,7 @@ module Run =
 
     /// Acts on recommendations generated from the given market
     /// overview.
-    let runOverview
+    let private runRecommendations
         context portfolio marketOverview =
         async {
                 // get asset recommendations for all candidates
@@ -160,6 +160,29 @@ module Run =
                     return recoResult, Array.empty, Array.empty
         }
 
+    /// Obtains and acts on a market overview.
+    let private runOverview context portfolio =
+        async {
+            let! marketOverviewResult =
+                MarketOverview.getAsync
+                    context.HttpClient
+                    context.Agent
+            match marketOverviewResult with
+                | MarketOverviewResult.Success overview ->
+                    let! recoResult, sellResults, buyResults =
+                        runRecommendations context portfolio overview
+                    return RunResult.create
+                        (Some (Ok portfolio))
+                        (Some marketOverviewResult)
+                        (Some recoResult)
+                        sellResults
+                        buyResults
+                | _ ->
+                    return RunResult.createWithoutRecommendation
+                        (Some (Ok portfolio))
+                        (Some marketOverviewResult)
+        }
+
     /// Runs once using the given context.
     let runOne context =
         async {
@@ -167,24 +190,7 @@ module Run =
                 | Ok true ->
                     match! Broker.getPortfolio context.Broker with
                         | Ok portfolio ->
-                            let! marketOverviewResult =
-                                MarketOverview.getAsync
-                                    context.HttpClient
-                                    context.Agent
-                            match marketOverviewResult with
-                                | MarketOverviewResult.Success overview ->
-                                    let! recoResult, sellResults, buyResults =
-                                        runOverview context portfolio overview
-                                    return RunResult.create
-                                        (Some (Ok portfolio))
-                                        (Some marketOverviewResult)
-                                        (Some recoResult)
-                                        sellResults
-                                        buyResults
-                                | _ ->
-                                    return RunResult.createWithoutRecommendation
-                                        (Some (Ok portfolio))
-                                        (Some marketOverviewResult)
+                            return! runOverview context portfolio
                         | Error exn ->
                             return RunResult.createWithoutOverview
                                 (Some (Error exn))
