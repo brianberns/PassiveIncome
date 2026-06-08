@@ -123,17 +123,21 @@ module AssetRecommendation =
             // prepare to lookup recommendations by asset
         let recoMap =
             recommendations
-                |> Seq.map (fun reco ->
-                    reco.Asset, reco)
+                |> Array.groupBy _.Asset
+                |> Array.map (fun (asset, recos) ->
+                    asset, Array.distinctBy _.Action recos)   // eliminate redundant recommendations
                 |> Map
 
-            // find recommendation for each candidate, if it exists
+            // find unique recommendation for each candidate, if it exists
         [|
             for (cand : Candidate) in candidates do
                 match Map.tryFind cand.Asset recoMap with
-                    | Some reco -> Ok reco
+                    | Some [| reco |] ->
+                        Ok reco
+                    | Some _ ->
+                        Error (cand.Asset, exn("Conflicting recommendations"))
                     | None ->
-                        Error (cand.Asset, exn("Agent ignored"))
+                        Error (cand.Asset, exn("Missing recommendation"))
         |]
 
     /// Determines asset recommendations from the given market
