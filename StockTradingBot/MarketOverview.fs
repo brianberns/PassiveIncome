@@ -132,7 +132,7 @@ module MarketOverview =
     let private getOverview agent utcNow (itemArrays : SyndicationItem[][]) =
         async {
                 // query agent
-            let! dtoResult =
+            let! result =
                 let prompt =
                     itemArrays
                         |> Seq.concat
@@ -142,7 +142,7 @@ module MarketOverview =
                 Agent.getResultAsync<MarketOverview> prompt agent
 
                 // process result
-            match dtoResult with
+            match result with
                 | Ok overview -> return Success overview
                 | Error exn ->  return AgentError exn
         }
