@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Readme.md" />
     <Compile Include="Domain.fs" />
     <Compile Include="Config.fs" />
     <Compile Include="Json.fs" />
@@ -26,6 +27,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
