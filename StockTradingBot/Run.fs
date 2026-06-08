@@ -163,24 +163,24 @@ module Run =
     /// Obtains and acts on a market overview.
     let private runOverview context portfolio =
         async {
-            let! marketOverviewResult =
+            let! overviewResult =
                 MarketOverview.getAsync
                     context.HttpClient
                     context.Agent
-            match marketOverviewResult with
+            match overviewResult with
                 | MarketOverviewResult.Success overview ->
                     let! recoResult, sellResults, buyResults =
                         runRecommendations context portfolio overview
                     return RunResult.create
                         (Some (Ok portfolio))
-                        (Some marketOverviewResult)
+                        (Some overviewResult)
                         (Some recoResult)
                         sellResults
                         buyResults
                 | _ ->
                     return RunResult.createWithoutRecommendation
                         (Some (Ok portfolio))
-                        (Some marketOverviewResult)
+                        (Some overviewResult)
         }
 
     /// Runs once using the given context.
