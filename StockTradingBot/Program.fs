@@ -6,6 +6,8 @@ open System.Reflection
 
 open Microsoft.Extensions.Configuration
 
+open FSharp.Control
+
 module Program =
 
     /// Run context.
@@ -36,4 +38,8 @@ module Program =
 
     do
         Console.OutputEncoding <- Text.Encoding.UTF8
-        Run.runLoop context |> Async.RunSynchronously
+        let delay = TimeSpan.FromHours(1)
+        async {
+            for result in Run.runLoop context delay do
+                Log.logRun result
+        } |> Async.RunSynchronously

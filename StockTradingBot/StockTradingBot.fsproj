@@ -15,14 +15,14 @@
     <Compile Include="Agent.fs" />
     <Compile Include="MarketOverview.fs" />
     <Compile Include="AssetRecommendation.fs" />
-    <Compile Include="RunResult.fs" />
-    <Compile Include="Log.fs" />
     <Compile Include="Run.fs" />
+    <Compile Include="Log.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Alpaca.Markets" Version="7.2.0" />
+    <PackageReference Include="FSharp.Control.AsyncSeq" Version="4.15.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
