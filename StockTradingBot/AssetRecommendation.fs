@@ -117,12 +117,12 @@ module AssetRecommendation =
                     prompt agent
         }
 
-    /// Creates recommendations for the given DTOs.
-    let private createRecommendations candidates dtos =
+    /// Matches recommendations to the given candidates.
+    let private matchRecommendations candidates recommendations =
 
-            // map assets to generated recommendations
+            // prepare to lookup recommendations by asset
         let recoMap =
-            dtos
+            recommendations
                 |> Seq.map (fun reco ->
                     reco.Asset, reco)
                 |> Map
@@ -161,7 +161,7 @@ module AssetRecommendation =
             match recosResult with
                 | Ok recos ->
                     let successResults =
-                        createRecommendations candidates recos
+                        matchRecommendations candidates recos
                     return Success [|
                         yield! feedErrorResults
                         yield! successResults
