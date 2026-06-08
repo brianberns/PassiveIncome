@@ -36,7 +36,7 @@ type Money =
     /// Display string.
     member money.String =
         let (Usd usd) = money
-        $"${usd}"
+        $"$%.2f{usd}"
 
     /// Display string.
     override money.ToString() =

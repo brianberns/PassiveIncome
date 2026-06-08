@@ -86,7 +86,9 @@ module Log =
             | Ok portfolio ->
                 printfn $"   Tradable cash: {portfolio.TradableCash}"
                 for (asset, value) in Map.toSeq portfolio.PositionMap do
-                    printfn $"   {asset}: {value.Quantity} @ {value.AverageEntryPrice}"
+                    printfn $"   {asset}: %.3f{value.Quantity} shares @ \
+                        {value.AverageEntryPrice}/share : \
+                        {value.Quantity * value.AverageEntryPrice}"
             | Error (exn : exn) ->
                 printfn $"   Error: {exn.Message}"
 
@@ -140,14 +142,14 @@ module Log =
                         printfn $"   Sold {quantity} shares of {sellResult.Asset} \
                             @ {avgPrice}: {quantity * avgPrice} total"
                     | Error exn ->
-                        printfn $"Sell error {exn.Message}"
+                        printfn $"Sell error: {exn.Message}"
             for (buyResult : OrderResult) in buyResults do
                 match buyResult.Result with
                     | Ok (avgPrice, quantity) ->
                         printfn $"   Bought {quantity} shares of {buyResult.Asset} \
                             @ {avgPrice}: {quantity * avgPrice} total"
                     | Error exn ->
-                        printfn $"Buy error {exn.Message}"
+                        printfn $"Buy error: {exn.Message}"
         else
             printfn "   None"
 
