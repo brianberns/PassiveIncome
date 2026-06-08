@@ -7,6 +7,29 @@ open Microsoft.Extensions.Configuration
 
 open Alpaca.Markets
 
+/// Information about a filled order.
+type FilledOrderDetail =
+    {
+        /// Average fill price.
+        AverageFillPrice : Money
+
+        /// Filled quantity.
+        FilledQuantity : decimal
+    }
+
+    /// Total price.
+    member detail.TotalPrice =
+        detail.FilledQuantity * detail.AverageFillPrice
+
+module FilledOrderDetail =
+
+    /// Creates a filled order detail.
+    let create averageFillPrice filledQuantity =
+        {
+            AverageFillPrice = averageFillPrice
+            FilledQuantity = filledQuantity
+        }
+
 /// Broker for buying/selling assets.
 type Broker =
     {
@@ -85,7 +108,9 @@ module Broker =
                         match Option.ofNullable order.AverageFillPrice with
                             | Some price ->
                                 return Ok (
-                                    Usd price, order.FilledQuantity)
+                                    FilledOrderDetail.create
+                                        (Usd price)
+                                        order.FilledQuantity)
                             | None ->
                                 return Error (Some status)   // hopefully this can never happen
 
@@ -114,8 +139,8 @@ module Broker =
                 let! posted =
                     broker.TradingClient.PostOrderAsync(order)
                 match! awaitOrder posted.OrderId broker with
-                    | Ok price ->
-                        return Ok price
+                    | Ok detail ->
+                        return Ok detail
                     | Error statusOpt ->
                         let msg =
                             statusOpt

@@ -64,16 +64,18 @@ module Log =
         if count > 0 then
             for (sellResult : OrderResult) in sellResults do
                 match sellResult.Result with
-                    | Ok (avgPrice, quantity) ->
-                        printfn $"   Sold {quantity} shares of {sellResult.Asset} \
-                            @ {avgPrice}: {quantity * avgPrice} total"
+                    | Ok detail ->
+                        printfn $"   Sold {detail.FilledQuantity} shares of \
+                            {sellResult.Asset} @ {detail.AverageFillPrice}: \
+                            {detail.TotalPrice} total"
                     | Error exn ->
                         printfn $"Sell error: {exn.Message}"
             for (buyResult : OrderResult) in buyResults do
                 match buyResult.Result with
-                    | Ok (avgPrice, quantity) ->
-                        printfn $"   Bought {quantity} shares of {buyResult.Asset} \
-                            @ {avgPrice}: {quantity * avgPrice} total"
+                    | Ok detail ->
+                        printfn $"   Bought {detail.FilledQuantity} shares of \
+                            {buyResult.Asset} @ {detail.AverageFillPrice}: \
+                            {detail.TotalPrice} total"
                     | Error exn ->
                         printfn $"Buy error: {exn.Message}"
         else

@@ -44,11 +44,7 @@ type OrderResult =
         Asset : Asset
 
         /// Result of trade.
-        Result :
-            Result<
-                Money (*avg. fill price*)
-                    * decimal (*filled quantity*),
-                exn>
+        Result : Result<FilledOrderDetail, exn>
     }
 
 module OrderResult =
@@ -174,8 +170,7 @@ module Run =
             sellResults
                 |> Seq.sumBy (fun (result : OrderResult) ->
                     match result.Result with
-                        | Ok (avgPrice, quantity) ->
-                            quantity * avgPrice
+                        | Ok detail -> detail.TotalPrice
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
