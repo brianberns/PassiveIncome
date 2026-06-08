@@ -46,10 +46,10 @@ module Run =
                 portfolio.PositionMap.Keys
                     |> Seq.map (fun asset ->
                         Candidate.create asset "In portfolio")
-            set [
+            [
                 yield! portfolioCandidates   // always consider selling assets in portfolio
                 yield! marketOverview.Candidates
-            ]
+            ] |> Seq.distinctBy _.Asset      // elminate redundant candidates
 
         AssetRecommendation.getAsync
             context.HttpClient

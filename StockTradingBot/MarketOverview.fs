@@ -4,6 +4,7 @@ open System
 open System.ServiceModel.Syndication
 
 /// Asset that we might be interested in.
+[<NoComparison>]
 type Candidate =
     {
         /// Candidate asset.
