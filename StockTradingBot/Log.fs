@@ -153,11 +153,31 @@ module Log =
 
     /// Logs a run.
     let logRun runResult =
+
         printfn ""
         printfn "-----------------------------------------"
         printfn ""
         printfn $"{DateTime.Now}"
-        Option.iter logPortfolio runResult.PortfolioResultOpt
-        Option.iter logMarketOverview runResult.MarketOverviewResultOpt
-        Option.iter logAssetRecommendations runResult.RecommendationResultOpt
-        logAssetOrders runResult.SellResults runResult.BuyResults
+
+            // is market open?
+        let marketIsOpen =
+            runResult.PortfolioResultOpt.IsSome   // to-do: this is a hacky signal
+        if marketIsOpen then
+            Option.iter
+                logPortfolio
+                runResult.PortfolioResultOpt
+            Option.iter
+                logMarketOverview
+                runResult.MarketOverviewResultOpt
+            Option.iter
+                logAssetRecommendations
+                runResult.RecommendationResultOpt
+            logAssetOrders
+                runResult.SellResults runResult.BuyResults
+        else
+            assert(runResult.MarketOverviewResultOpt.IsNone)
+            assert(runResult.RecommendationResultOpt.IsNone)
+            assert(runResult.SellResults.Length = 0)
+            assert(runResult.BuyResults.Length = 0)
+            printfn "Market is closed"
+
