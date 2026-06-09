@@ -26,9 +26,15 @@ module Program =
     let settings =
         {|
             UserAgent = "StockTradingBot/0.1 (mailto:brianberns@gmail.com)"
+#if DEBUG
+            Model = Model.openRouter
+            CreateBroker = AlpacaDummy.createBroker
+            Run = runOne
+#else
             Model = Model.gemini
             CreateBroker = Alpaca.createBroker
             Run = runLoop
+#endif
         |}
 
     /// Run context.
