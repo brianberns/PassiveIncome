@@ -68,7 +68,7 @@ module Log =
                             {sellResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error exn ->
-                        printfn $"Sell error: {sellResult.Asset}: {exn.Message}"
+                        printfn $"   Sell error: {sellResult.Asset}: {exn.Message}"
             for (buyResult : OrderResult) in buyResults do
                 match buyResult.Result with
                     | Ok detail ->
@@ -76,7 +76,7 @@ module Log =
                             {buyResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error exn ->
-                        printfn $"Buy error: {buyResult.Asset}: {exn.Message}"
+                        printfn $"   Buy error: {buyResult.Asset}: {exn.Message}"
         else
             printfn "   None"
 
