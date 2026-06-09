@@ -2,7 +2,6 @@ namespace StockTradingBot
 
 open System
 open System.ClientModel
-open System.Threading
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
@@ -83,7 +82,8 @@ module Agent =
             OpenAIClient(
                 ApiKeyCredential(config[model.ApiKeyName]),
                 OpenAIClientOptions(
-                    Endpoint = Uri(model.Endpoint)))
+                    Endpoint = Uri(model.Endpoint),
+                    NetworkTimeout = TimeSpan.FromMinutes(10.0)))
         let chatClient =
             openAIClient
                 .GetChatClient(model.Id)
@@ -97,9 +97,6 @@ module Agent =
     /// of data.
     let getResultAsync<'t> (prompt : string) agent =
         task {
-            use cts =
-                new CancellationTokenSource(
-                    TimeSpan.FromMinutes(5.0))
             try
                 let! response =
                     ChatClientStructuredOutputExtensions
@@ -107,8 +104,7 @@ module Agent =
                             agent.ChatClient,
                             prompt,
                             useJsonSchemaResponseFormat =
-                                agent.Model.SupportsJsonSchema,
-                            cancellationToken = cts.Token)
+                                agent.Model.SupportsJsonSchema)
                 return Ok response.Result
             with exn ->
                 return Error exn
