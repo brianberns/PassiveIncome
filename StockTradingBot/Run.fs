@@ -129,17 +129,6 @@ module Run =
             marketOverview.Trend
             candidates
 
-    /// Separates sell recommendations from buy recommendations.
-    let private partition recommendations =
-        recommendations
-            |> Array.where (fun reco ->
-                reco.Action <> AssetAction.Hold)
-            |> Array.partitionWith (fun reco ->
-                match reco.Action with
-                    | AssetAction.Sell -> Choice1Of2 reco.Asset
-                    | AssetAction.Buy -> Choice2Of2 reco.Asset
-                    | _ -> failwith "Unexpected")
-
     /// Obtains quantity of each of the given assets in the
     /// given portfolio.
     let private getQuantities portfolio assets =
@@ -189,11 +178,35 @@ module Run =
     /// Places orders based on the given recommendations.
     let private placeOrders broker portfolio recommendations =
         async {
-                // sell assets first to generate cash
-            let sells, buys = partition recommendations
+                // organize recommendations by action (buy, sell, hold)
+            let lookup =
+                let actionMap =
+                    recommendations
+                        |> Array.groupBy _.Action
+                        |> Array.map (fun (action, group) ->
+                            action, group |> Array.map _.Asset)
+                        |> Map
+                fun action ->
+                    actionMap
+                        |> Map.tryFind action
+                        |> Option.defaultValue Array.empty
+            let buys = lookup AssetAction.Buy
+            let sells = lookup AssetAction.Sell
+            let holds = lookup AssetAction.Hold
+
+                // sell in-portfolio holds when we want to buy
+            let sells =
+                if buys.Length > 0 then
+                    holds
+                        |> Array.where
+                            portfolio.PositionMap.ContainsKey
+                        |> Array.append sells
+                else sells
+
+                // sell first to generate cash
             let! sellResults =
                 sells
-                    |> getQuantities portfolio   // can only sell assets we own
+                    |> getQuantities portfolio   // sell all owned shares
                     |> sellAssetQuantities broker
             let cash = getSpendableCash portfolio sellResults
 
