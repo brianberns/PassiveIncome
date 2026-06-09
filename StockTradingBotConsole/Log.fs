@@ -52,6 +52,7 @@ module Log =
                             printfn ""
                             printfn $"Asset error: {asset}: {exn.Message}"
             | AssetRecommendationResult.AgentError exn ->
+                printfn ""
                 printfn $"Agent error: {exn.Message}"
 
     /// Logs asset orders.
