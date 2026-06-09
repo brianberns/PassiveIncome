@@ -5,6 +5,7 @@
   <Project Path="Fable.Remoting.Suave/Fable.Remoting.Suave/Fable.Remoting.Suave.fsproj" />
   <Project Path="StockTradingBot/StockTradingBot.fsproj" Id="7a9354be-d80c-491a-bbda-b8018a23d836" />
   <Project Path="StockTradingBotConsole/StockTradingBotConsole.fsproj" Id="f07b7ba2-b278-4e01-8935-e8aa322ade5e" />
+  <Project Path="StockTradingBotWeb/StockTradingBotClient/src/StockTradingBotClient.fsproj" />
   <Project Path="StockTradingBotWeb/StockTradingBotHarness/StockTradingBotHarness.fsproj" />
   <Project Path="StockTradingBotWeb/StockTradingBotServer/StockTradingBotServer.fsproj" Id="ff1cfb6c-95d4-41a8-b91b-e64df1b51164" />
 </Solution>

@@ -30,3 +30,12 @@ desktop.ini
 *.log
 *.swp
 *~
+
+# Fable generated files
+.fable
+*.fs.js
+*.fs.js.map
+fable_modules/
+bundle.js
+temp/**
+node_modules/
