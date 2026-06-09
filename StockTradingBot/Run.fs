@@ -257,17 +257,25 @@ module Run =
                     return recoResult, Array.empty, Array.empty
         }
 
-    /// Obtains and acts on a market overview.
+    /// Requests and acts on a market overview.
     let private runOverview context startTime portfolio =
         async {
+                // request market overview from agent
             let! overviewResult =
                 MarketOverview.getAsync
                     context.HttpClient
                     context.Agent
+
             match overviewResult with
                 | MarketOverviewResult.Success overview ->
+
+                        // pause to honor rate limits (avoid "Too Many Requests" 429 errors)
+                    do! Async.Sleep(TimeSpan.FromMinutes(1.0))
+
+                        // request and act on recommendations
                     let! recoResult, sellResults, buyResults =
                         runRecommendations context portfolio overview
+
                     return RunResult.create
                         startTime
                         (Some (Ok portfolio))
