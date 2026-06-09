@@ -46,12 +46,12 @@ module Model =
             SupportsJsonSchema = false
         }
 
-    /// DeepSeek.
-    let deepSeek =
+    /// OpenRouter.
+    let openRouter =
         {
-            Id = "deepseek-chat"
-            ApiKeyName = "DeepSeek:ApiKey"
-            Endpoint = "https://api.deepseek.com"
+            Id = "openrouter/free"
+            ApiKeyName = "OpenRouter:ApiKey"
+            Endpoint = "https://openrouter.ai/api/v1"
             SupportsJsonSchema = true
         }
 
