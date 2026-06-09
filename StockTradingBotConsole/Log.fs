@@ -115,4 +115,4 @@ module Log =
             (runResult.EndTime - runResult.StartTime)
                 .ToString(@"m\:ss\.ff")
         printfn ""
-        printfn $"Duration: {duration}"
+        printfn $"Duration: {duration} (m:ss)"

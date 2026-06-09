@@ -269,9 +269,6 @@ module Run =
             match overviewResult with
                 | MarketOverviewResult.Success overview ->
 
-                        // pause to honor rate limits (avoid "Too Many Requests" 429 errors)
-                    do! Async.Sleep(TimeSpan.FromMinutes(1.0))
-
                         // request and act on recommendations
                     let! recoResult, sellResults, buyResults =
                         runRecommendations context portfolio overview
