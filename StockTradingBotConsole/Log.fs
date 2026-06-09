@@ -45,10 +45,9 @@ module Log =
                 for result in results do
                     match result with
                         | Ok reco ->
-                            if reco.Action <> AssetAction.Hold then
-                                printfn ""
-                                printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                                printfn $"{reco.Reason}"
+                            printfn ""
+                            printfn $"{reco.Asset.Symbol}: {reco.Action}"
+                            printfn $"{reco.Reason}"
                         | Error (asset : Asset, exn : exn) ->
                             printfn ""
                             printfn $"Asset error: {asset}: {exn.Message}"
