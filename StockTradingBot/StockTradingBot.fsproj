@@ -11,6 +11,7 @@
     <Compile Include="Money.fs" />
     <Compile Include="Portfolio.fs" />
     <Compile Include="Broker.fs" />
+    <Compile Include="Alpaca.fs" />
     <Compile Include="Agent.fs" />
     <Compile Include="MarketOverview.fs" />
     <Compile Include="AssetRecommendation.fs" />
