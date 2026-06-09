@@ -2,6 +2,7 @@ namespace StockTradingBot
 
 open System
 open System.ClientModel
+open System.ClientModel.Primitives
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
@@ -83,7 +84,8 @@ module Agent =
                 ApiKeyCredential(config[model.ApiKeyName]),
                 OpenAIClientOptions(
                     Endpoint = Uri(model.Endpoint),
-                    NetworkTimeout = TimeSpan.FromMinutes(10.0)))
+                    NetworkTimeout = TimeSpan.FromMinutes(5.0),
+                    RetryPolicy = ClientRetryPolicy(maxRetries = 3)))   // maxRetries+1 tries total + small exponential backoff between retries
         let chatClient =
             openAIClient
                 .GetChatClient(model.Id)
