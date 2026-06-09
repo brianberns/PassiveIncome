@@ -5,9 +5,9 @@ open System.Threading.Tasks
 
 open Microsoft.Extensions.Configuration
 
-module Alpaca =
+open Alpaca.Markets
 
-    open Alpaca.Markets
+module Alpaca =
 
     /// Alpaca API.
     type private Api =
