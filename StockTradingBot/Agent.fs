@@ -50,7 +50,7 @@ module Model =
     let deepSeek =
         {
             Id = "deepseek-chat"
-            ApiKeyName = "Groq:ApiKey"
+            ApiKeyName = "DeepSeek:ApiKey"
             Endpoint = "https://api.deepseek.com"
             SupportsJsonSchema = true
         }
