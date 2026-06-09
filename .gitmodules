@@ -1,0 +1,3 @@
+[submodule "Fable.Remoting.Suave"]
+	path = Fable.Remoting.Suave
+	url = https://github.com/brianberns/Fable.Remoting.Suave
