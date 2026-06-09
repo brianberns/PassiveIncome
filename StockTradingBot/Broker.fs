@@ -184,3 +184,21 @@ module Alpaca =
             Sell = sell api
             Buy = buy api
         }
+
+module AlpacaDummy =
+
+    /// Creates a broker that is always open, but all trades fail.
+    let createBroker config =
+        let impl = Alpaca.createBroker config
+        {
+            GetPortfolio =
+                impl.GetPortfolio
+            IsMarketOpen =
+                fun () -> async { return Ok true }
+            Sell =
+                fun asset quantity ->
+                    async { return Error (exn "Dummy") }
+            Buy =
+                fun asset spend ->
+                    async { return Error (exn "Dummy") }
+        }
