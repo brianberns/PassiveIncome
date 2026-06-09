@@ -49,7 +49,7 @@ module Model =
     /// OpenRouter.
     let openRouter =
         {
-            Id = "openrouter/free"
+            Id = "openrouter/owl-alpha"
             ApiKeyName = "OpenRouter:ApiKey"
             Endpoint = "https://openrouter.ai/api/v1"
             SupportsJsonSchema = true
