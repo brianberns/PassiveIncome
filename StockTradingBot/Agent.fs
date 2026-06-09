@@ -2,6 +2,7 @@ namespace StockTradingBot
 
 open System
 open System.ClientModel
+open System.Threading
 
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Configuration
@@ -96,6 +97,9 @@ module Agent =
     /// of data.
     let getResultAsync<'t> (prompt : string) agent =
         task {
+            use cts =
+                new CancellationTokenSource(
+                    TimeSpan.FromMinutes(5.0))
             try
                 let! response =
                     ChatClientStructuredOutputExtensions
@@ -103,7 +107,8 @@ module Agent =
                             agent.ChatClient,
                             prompt,
                             useJsonSchemaResponseFormat =
-                                agent.Model.SupportsJsonSchema)
+                                agent.Model.SupportsJsonSchema,
+                            cancellationToken = cts.Token)
                 return Ok response.Result
             with exn ->
                 return Error exn
