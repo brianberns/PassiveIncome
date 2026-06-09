@@ -27,7 +27,7 @@ module Program =
         {|
             UserAgent = "StockTradingBot/0.1 (mailto:brianberns@gmail.com)"
             Model = Model.gemini
-            CreateBroker = AlpacaDummy.createBroker
+            CreateBroker = Alpaca.createBroker
             Run = runLoop
         |}
 
