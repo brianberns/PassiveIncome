@@ -59,6 +59,9 @@ module OrderResult =
 /// Result of a single run.
 type RunResult =
     {
+        /// Start of run.
+        StartTime : DateTimeOffset
+        
         /// Portfolio at start of run.
         PortfolioResultOpt : Option<Result<Portfolio, exn>>
 
@@ -73,39 +76,52 @@ type RunResult =
 
         /// Buy results.
         BuyResults : OrderResult[]
+
+        /// End of run.
+        EndTime : DateTimeOffset
     }
 
 module RunResult =
 
     /// Creates a run result.
     let create
+        startTime
         portfolioResultOpt
         marketOverviewResultOpt
         recommendationResultOpt
         sellResults
-        buyResults =
+        buyResults
+        endTime =
         {
+            StartTime = startTime
             PortfolioResultOpt = portfolioResultOpt
             MarketOverviewResultOpt = marketOverviewResultOpt
             RecommendationResultOpt = recommendationResultOpt
             SellResults = sellResults
             BuyResults = buyResults
+            EndTime = endTime
         }
 
     /// Creates a run result.
     let createWithoutRecommendation
+        startTime
         portfolioResultOpt
-        marketOverviewResultOpt =
+        marketOverviewResultOpt
+        endTime =
         create
+            startTime
             portfolioResultOpt
             marketOverviewResultOpt
             None Array.empty Array.empty
+            endTime
 
     /// Creates a run result.
-    let createWithoutOverview portfolioResultOpt =
+    let createWithoutOverview startTime portfolioResultOpt endTime =
         createWithoutRecommendation
+            startTime
             portfolioResultOpt
             None
+            endTime
 
 module Run =
 
@@ -242,7 +258,7 @@ module Run =
         }
 
     /// Obtains and acts on a market overview.
-    let private runOverview context portfolio =
+    let private runOverview context startTime portfolio =
         async {
             let! overviewResult =
                 MarketOverview.getAsync
@@ -253,34 +269,44 @@ module Run =
                     let! recoResult, sellResults, buyResults =
                         runRecommendations context portfolio overview
                     return RunResult.create
+                        startTime
                         (Some (Ok portfolio))
                         (Some overviewResult)
                         (Some recoResult)
                         sellResults
                         buyResults
+                        DateTimeOffset.Now
                 | _ ->
                     return RunResult.createWithoutRecommendation
+                        startTime
                         (Some (Ok portfolio))
                         (Some overviewResult)
+                        DateTimeOffset.Now
         }
 
     /// Runs once using the given context.
     let runOne context =
         async {
+            let startTime = DateTimeOffset.Now
             match! context.Broker.IsMarketOpen () with
                 | Ok true ->
                     match! context.Broker.GetPortfolio () with
                         | Ok portfolio ->
-                            return! runOverview context portfolio
+                            return! runOverview
+                                context startTime portfolio
                         | Error exn ->
                             return RunResult.createWithoutOverview
+                                startTime
                                 (Some (Error exn))
+                                DateTimeOffset.Now
                 | Ok false ->
                     return RunResult.createWithoutOverview
-                        None
+                        startTime None DateTimeOffset.Now
                 | Error exn ->
                     return RunResult.createWithoutOverview
+                        startTime
                         (Some (Error exn))
+                        DateTimeOffset.Now
         }
 
     /// Runs in an infinite loop using the given context.

@@ -86,7 +86,7 @@ module Log =
         printfn ""
         printfn "-----------------------------------------"
         printfn ""
-        printfn $"{DateTime.Now}"
+        printfn $"{runResult.StartTime}"
 
             // is market open?
         let marketIsOpen =
@@ -110,3 +110,8 @@ module Log =
             assert(runResult.BuyResults.Length = 0)
             printfn "Market is closed"
 
+        let duration =
+            (runResult.EndTime - runResult.StartTime)
+                .ToString(@"m\:ss\.ff")
+        printfn ""
+        printfn $"Duration: {duration}"
