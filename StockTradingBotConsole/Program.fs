@@ -30,7 +30,7 @@ module Program =
         let agent = Agent.create config Model.gemini
 
         /// Broker for buying/selling assets.
-        let broker = Broker.create config
+        let broker = Alpaca.createBroker config
 
         RunContext.create httpClient agent broker
 

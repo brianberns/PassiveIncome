@@ -156,7 +156,7 @@ module Run =
             |> Seq.map (fun (asset, quantity) ->
                 async {
                     let! result =
-                        Broker.sell asset quantity broker
+                        broker.Sell asset quantity
                     return OrderResult.create asset result
                 })
             |> Async.Sequential   // avoid hammering the broker API
@@ -181,7 +181,7 @@ module Run =
             |> Seq.map (fun asset ->
                 async {
                     let! result =
-                        Broker.buy asset portion broker
+                        broker.Buy asset portion
                     return OrderResult.create asset result
                 })
             |> Async.Sequential   // avoid hammering the broker API
@@ -254,9 +254,9 @@ module Run =
     /// Runs once using the given context.
     let runOne context =
         async {
-            match! Broker.isMarketOpen context.Broker with
+            match! context.Broker.IsMarketOpen () with
                 | Ok true ->
-                    match! Broker.getPortfolio context.Broker with
+                    match! context.Broker.GetPortfolio () with
                         | Ok portfolio ->
                             return! runOverview context portfolio
                         | Error exn ->

@@ -5,8 +5,6 @@ open System.Threading.Tasks
 
 open Microsoft.Extensions.Configuration
 
-open Alpaca.Markets
-
 /// Information about a filled order.
 type FilledOrderDetail =
     {
@@ -33,38 +31,34 @@ module FilledOrderDetail =
 /// Broker for buying/selling assets.
 type Broker =
     {
-        /// Data client.
-        DataClient : IAlpacaDataClient
-
-        /// Trading client.
-        TradingClient : IAlpacaTradingClient
+        GetPortfolio : unit -> Async<Result<Portfolio, exn>>
+        IsMarketOpen : unit -> Async<Result<bool, exn>>
+        Sell : Asset -> decimal (*quantity*) -> Async<Result<FilledOrderDetail, exn>>
+        Buy : Asset -> Money (*total spend*) -> Async<Result<FilledOrderDetail, exn>>
     }
 
-module Broker =
+module Alpaca =
 
-    /// Creates a broker.
-    let create (config : IConfiguration) =
-        let key =
-            let keyId = config["Alpaca:KeyId"]
-            let secret = config["Alpaca:Secret"]
-            SecretKey(keyId, secret)
-        let env = Environments.Paper
+    open Alpaca.Markets
+
+    /// Alpaca API.
+    type private Api =
         {
-            DataClient = env.GetAlpacaDataClient(key)
-            TradingClient = env.GetAlpacaTradingClient(key)
+            DataClient : IAlpacaDataClient
+            TradingClient : IAlpacaTradingClient
         }
 
-    /// Gets the current portfolio at the given broker.
-    let getPortfolio broker =
+    /// Gets the current portfolio.
+    let private getPortfolio api =
         task {
             try
                     // get available cash
-                let! account = broker.TradingClient.GetAccountAsync()
+                let! account = api.TradingClient.GetAccountAsync()
                 let cash = Usd account.TradableCash
 
                     // get positions
                 let! positions =
-                    broker.TradingClient.ListPositionsAsync()
+                    api.TradingClient.ListPositionsAsync()
                 let positionMap =
                     Map [
                         for position in positions do
@@ -81,11 +75,11 @@ module Broker =
                 return Error exn
         } |> Async.AwaitTask
 
-    /// Is the given broker's market currently open?
-    let isMarketOpen broker =
+    /// Is the market currently open?
+    let private isMarketOpen api =
         task {
             try
-                let! clock = broker.TradingClient.GetClockAsync()
+                let! clock = api.TradingClient.GetClockAsync()
                 return Ok clock.IsOpen
             with exn ->
                 return Error exn
@@ -94,13 +88,13 @@ module Broker =
     /// Waits a while (but not forever) for the given order
     /// to fill, and then answers its average fill price
     /// and filled quantity.
-    let private awaitOrder orderId broker =
+    let private awaitOrder api orderId =
 
         let rec loop n =
             task {
                 do! Task.Delay 250
                 let! order =
-                    broker.TradingClient.GetOrderAsync(orderId : Guid)
+                    api.TradingClient.GetOrderAsync(orderId : Guid)
                 match order.OrderStatus with
 
                         // order succeeded
@@ -133,12 +127,12 @@ module Broker =
         loop 0
 
     /// Places the given order.
-    let private placeOrder (order : MarketOrder) broker =
+    let private placeOrder api (order : MarketOrder) =
         task {
             try
                 let! posted =
-                    broker.TradingClient.PostOrderAsync(order)
-                match! awaitOrder posted.OrderId broker with
+                    api.TradingClient.PostOrderAsync(order)
+                match! awaitOrder api posted.OrderId with
                     | Ok detail ->
                         return Ok detail
                     | Error statusOpt ->
@@ -152,22 +146,41 @@ module Broker =
         } |> Async.AwaitTask
 
     /// Sells the given quantity of the given asset.
-    let sell asset quantity broker =
+    let private sell api asset quantity =
         async {
             let order =
                 MarketOrder.Sell(
                     asset.Symbol,
                     OrderQuantity.Fractional(quantity))
-            return! placeOrder order broker
+            return! placeOrder api order
         }
 
     /// Buys the given value of the given asset.
-    let buy asset (Usd usd) broker =
+    let private buy api asset (Usd usd) =
         async {
             let usd = truncate (usd * 100m) / 100m   // Alpaca: notional value must be limited to 2 decimal places
             let order =
                 MarketOrder.Buy(
                     asset.Symbol,
                     OrderQuantity.Notional(usd))
-            return! placeOrder order broker
+            return! placeOrder api order
+        }
+
+    /// Creates a broker.
+    let createBroker (config : IConfiguration) =
+        let key =
+            let keyId = config["Alpaca:KeyId"]
+            let secret = config["Alpaca:Secret"]
+            SecretKey(keyId, secret)
+        let env = Environments.Paper
+        let api =
+            {
+                DataClient = env.GetAlpacaDataClient(key)
+                TradingClient = env.GetAlpacaTradingClient(key)
+            }
+        {
+            GetPortfolio = fun () -> getPortfolio api
+            IsMarketOpen = fun () -> isMarketOpen api
+            Sell = sell api
+            Buy = buy api
         }
