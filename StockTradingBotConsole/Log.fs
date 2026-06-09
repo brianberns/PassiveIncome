@@ -64,7 +64,7 @@ module Log =
             for (sellResult : OrderResult) in sellResults do
                 match sellResult.Result with
                     | Ok detail ->
-                        printfn $"   Sold {detail.FilledQuantity} shares of \
+                        printfn $"   Sold %.3f{detail.FilledQuantity} shares of \
                             {sellResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error exn ->
@@ -72,7 +72,7 @@ module Log =
             for (buyResult : OrderResult) in buyResults do
                 match buyResult.Result with
                     | Ok detail ->
-                        printfn $"   Bought {detail.FilledQuantity} shares of \
+                        printfn $"   Bought %.3f{detail.FilledQuantity} shares of \
                             {buyResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error exn ->

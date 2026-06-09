@@ -155,7 +155,7 @@ module Alpaca =
 
 module AlpacaDummy =
 
-    /// Creates a broker that is always open, but all trades fail.
+    /// Creates a broker that is always open.
     let createBroker config =
         let impl = Alpaca.createBroker config
         {
@@ -165,7 +165,12 @@ module AlpacaDummy =
                 fun () -> async { return Ok true }
             Sell =
                 fun asset quantity ->
-                    async { return Error (exn "Dummy") }
+                    async {
+                        return Ok (
+                            FilledOrderDetail.create
+                                (Usd 10m)
+                                quantity)
+                    }
             Buy =
                 fun asset spend ->
                     async { return Error (exn "Dummy") }
