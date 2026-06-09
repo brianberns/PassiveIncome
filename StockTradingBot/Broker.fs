@@ -33,8 +33,12 @@ type Broker =
         IsMarketOpen : unit -> Async<Result<bool, exn>>
 
         /// Sells the given quantity of the given asset.
-        Sell : Asset -> decimal (*quantity*) -> Async<Result<FilledOrderDetail, exn>>
+        Sell :
+            Asset -> decimal (*quantity*)
+                -> Async<Result<FilledOrderDetail, exn>>
 
         /// Buys the given asset with the given money.
-        Buy : Asset -> Money (*total spend*) -> Async<Result<FilledOrderDetail, exn>>
+        Buy :
+            Asset -> Money (*total spend*)
+                -> Async<Result<FilledOrderDetail, exn>>
     }
