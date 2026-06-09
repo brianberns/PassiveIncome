@@ -46,6 +46,15 @@ module Model =
             SupportsJsonSchema = false
         }
 
+    /// DeepSeek.
+    let deepSeek =
+        {
+            Id = "deepseek-chat"
+            ApiKeyName = "Groq:ApiKey"
+            Endpoint = "https://api.deepseek.com"
+            SupportsJsonSchema = true
+        }
+
 /// Decision-making agent.
 type Agent =
     {
