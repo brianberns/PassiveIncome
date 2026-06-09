@@ -16,6 +16,12 @@ module Program =
                 Log.logRun result
         }
 
+    let runOne context =
+        async {
+            let! result = Run.runOne context
+            Log.logRun result
+        }
+
     /// Settings.
     let settings =
         {|
