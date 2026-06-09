@@ -9,6 +9,14 @@ open FSharp.Control
 
 module Program =
 
+    /// Settings.
+    let settings =
+        {|
+            UserAgent = "StockTradingBot/0.1 (mailto:brianberns@gmail.com)"
+            Model = Model.gemini
+            CreateBroker = AlpacaDummy.createBroker
+        |}
+
     /// Run context.
     let context =
 
@@ -17,7 +25,7 @@ module Program =
             let client = new HttpClient()
             client.DefaultRequestHeaders
                 .UserAgent
-                .ParseAdd("StockTradingBot/0.1 (mailto:brianberns@gmail.com)")   // needed to avoid 429 errors from Yahoo
+                .ParseAdd(settings.UserAgent)   // default value causes 429 errors from Yahoo
             client
 
         /// Program configuration.
@@ -27,10 +35,10 @@ module Program =
                 .Build()
 
         /// Decision-making agent.
-        let agent = Agent.create config Model.gemini
+        let agent = Agent.create config settings.Model
 
         /// Broker for buying/selling assets.
-        let broker = Alpaca.createBroker config
+        let broker = settings.CreateBroker config
 
         RunContext.create httpClient agent broker
 
