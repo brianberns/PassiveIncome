@@ -10,11 +10,11 @@ module Log =
         printfn "Portfolio:"
         match result with
             | Ok portfolio ->
-                printfn $"   Tradable cash: {portfolio.TradableCash}"
                 for (asset, value) in Map.toSeq portfolio.PositionMap do
                     printfn $"   {asset}: %.3f{value.Quantity} shares @ \
-                        {value.AverageEntryPrice}/share : \
-                        {value.Quantity * value.AverageEntryPrice}"
+                        {value.CurrentPrice}/share = {value.Value}"
+                printfn $"   Cash: {portfolio.TradableCash}"
+                printfn $"   Total value: {portfolio.TotalValue}"
             | Error (exn : exn) ->
                 printfn $"   Error: {exn.Message}"
 

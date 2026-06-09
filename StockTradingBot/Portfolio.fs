@@ -24,17 +24,21 @@ type AssetValue =
         /// Amount of asset in the portfolio.
         Quantity : decimal
 
-        /// Average entry price of the asset in the portfolio.
-        AverageEntryPrice : Money
+        /// Current price of the asset in the portfolio.
+        CurrentPrice : Money
     }
+
+    /// Value of the asset at its current price.
+    member this.Value =
+        this.Quantity * this.CurrentPrice
 
 module AssetValue =
 
     /// Creates an asset value.
-    let create quantity averageEntryPrice =
+    let create quantity currentPrice =
         {
             Quantity = quantity
-            AverageEntryPrice = averageEntryPrice
+            CurrentPrice = currentPrice
         }
 
 /// An investment portfolio.
@@ -46,6 +50,12 @@ type Portfolio =
         /// Assets in the portfolio.
         PositionMap : Map<Asset, AssetValue>
     }
+
+    /// Total value of this portfolio: assets + cash.
+    member portfolio.TotalValue =
+        (portfolio.PositionMap.Values
+            |> Seq.sumBy _.Value)
+            + portfolio.TradableCash
 
 module Portfolio =
 
