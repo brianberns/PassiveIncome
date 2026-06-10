@@ -19,6 +19,7 @@ module Api =
         async {
             for result in Run.runLoop context delay do
                 lock runResults (fun () ->
+                    printfn $"{result.StartTime}"
                     runResults.Add(result))
         }
 

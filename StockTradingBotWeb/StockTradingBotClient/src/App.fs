@@ -1,38 +1,59 @@
-module App
+namespace StockTradingBot
 
 open Feliz
 open Elmish
 open Elmish.React
 
-type State = { Count: int }
+module Remoting =
 
-type Msg =
-    | Increment
-    | Decrement
+    open Fable.Remoting.Client
 
-let init() = { Count = 0 }, Cmd.none
+    /// Prefix routes with /StockTradingBot.
+    let routeBuilder typeName methodName = 
+        sprintf "/StockTradingBot/%s/%s" typeName methodName
 
-let update (msg: Msg) (state: State) =
-    match msg with
-    | Increment -> { Count = state.Count + 1 }, Cmd.none
-    | Decrement -> { Count = state.Count - 1 }, Cmd.none
+    /// Server API.
+    let api =
+        Remoting.createApi()
+            |> Remoting.withRouteBuilder routeBuilder
+            |> Remoting.buildProxy<IStockTradingBotApi>
 
-let render (state: State) (dispatch: Msg -> unit) =
-    Html.div [
-        Html.button [
-            prop.onClick (fun _ -> dispatch Increment)
-            prop.text "Increment"
+    let getResults () =
+        async {
+            match! Async.Catch(api.GetResults ()) with
+                | Choice1Of2 results -> return results
+                | Choice2Of2 exn -> return failwith exn.Message
+        }
+
+module App =
+
+    type State = RunResult[]
+
+    type Msg =
+        | ResultsReceived of RunResult[]
+
+    let init () =
+        let cmd =
+            Cmd.OfAsync.perform
+                Remoting.getResults
+                ()
+                ResultsReceived
+        Array.empty, cmd
+
+    let update msg (state : State) =
+        match msg with
+            | ResultsReceived results ->
+                results, Cmd.none
+
+    let render state (dispatch : Msg -> unit) =
+        Html.div [
+            for runResult in state do
+                Html.div [
+                    prop.text "Result"
+                ]
         ]
 
-        Html.button [
-            prop.onClick (fun _ -> dispatch Decrement)
-            prop.text "Decrement"
-        ]
-
-        Html.h1 state.Count
-    ]
-
-Program.mkProgram init update render
-    |> Program.withReactSynchronous "elmish-app"
-    |> Program.withConsoleTrace
-    |> Program.run
+    Program.mkProgram init update render
+        |> Program.withReactSynchronous "elmish-app"
+        |> Program.withConsoleTrace
+        |> Program.run

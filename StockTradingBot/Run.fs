@@ -1,9 +1,6 @@
 ﻿namespace StockTradingBot
 
 open System
-open System.Net.Http
-
-open FSharp.Control
 
 /// Result of placing an order.
 type OrderResult =
@@ -92,6 +89,9 @@ module RunResult =
             endTime
 
 #if !FABLE_COMPILER
+
+open System.Net.Http
+open FSharp.Control
 
 (*
  * Steps in a run:
