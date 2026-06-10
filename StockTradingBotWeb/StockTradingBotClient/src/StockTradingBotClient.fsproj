@@ -10,7 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\StockTradingBotServer\Shared.fs" />
-    <Compile Include="JQuery.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
