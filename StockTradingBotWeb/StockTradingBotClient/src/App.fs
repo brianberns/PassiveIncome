@@ -2,7 +2,7 @@ namespace StockTradingBot
 
 open System
 
-open Browser.Dom
+open Fable.Core
 
 open Feliz
 open Elmish
@@ -15,30 +15,66 @@ module App =
 
     type State = Result<RunResult[], string>
 
-    type Msg = Update of State
+    type Msg =
+
+        /// Fetch the latest results from the server.
+        | Refresh
+
+        /// Replace the current state with a fetched result.
+        | Update of State
+
+    /// Command that fetches the latest results.
+    let private fetchResults =
+        Cmd.OfAsync.perform
+            Remoting.getResults
+            ()
+            Update
 
     let init () =
-        let cmd =
-            Cmd.OfAsync.perform
-                Remoting.getResults
-                ()
-                Update
-        Ok (Array.empty), cmd
+        Ok (Array.empty), fetchResults
 
     let update msg (state : State) =
         match msg with
+            | Refresh -> state, fetchResults
             | Update state -> state, Cmd.none
+
+    /// Subscription that dispatches the given message on a timer.
+    let private timer (interval : TimeSpan) msg =
+        fun dispatch ->
+            let intervalId =
+                JS.setInterval
+                    (fun () -> dispatch msg)
+                    (int interval.TotalMilliseconds)
+            { new IDisposable with
+                member _.Dispose() = JS.clearInterval intervalId }
+
+    /// Periodically refreshes the results.
+    let private subscribe _state =
+        [ [ "refresh" ], timer refreshInterval Refresh ]
 
     /// Formats a quantity of shares.
     let private formatQty (quantity : decimal) =
         sprintf "%.3f" (float quantity)
 
-    /// Formats the duration between two times as "m:ss.ff".
+    /// Formats a timestamp as e.g. "Jun 10, 2026 3:43 PM".
+    let private formatTimestamp (time : DateTimeOffset) =
+        let date = time.ToString("MMM d, yyyy")
+        let hour =
+            match time.Hour % 12 with   // .Hour is offset-aware; Fable's "tt" token is not
+                | 0 -> 12
+                | h -> h
+        let minute = sprintf "%02d" time.Minute
+        let amPm = if time.Hour < 12 then "AM" else "PM"
+        $"{date} {hour}:{minute} {amPm}"
+
+    /// Describes the duration between two times, rounded to the
+    /// nearest second.
     let private formatDuration (startTime : DateTimeOffset) (endTime : DateTimeOffset) =
-        let span = endTime - startTime
-        let minutes = int span.TotalMinutes
-        let seconds = span.TotalSeconds - float (minutes * 60)
-        sprintf "%d:%05.2f" minutes seconds
+        let totalSeconds =
+            (endTime - startTime).TotalSeconds |> round |> int
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        $"Bot ran for {minutes} minutes, {seconds} seconds"
 
     /// A titled section within a run card.
     let private section title children =
@@ -120,13 +156,20 @@ module App =
                     Html.div [
                         prop.className "trend"
                         prop.children [
-                            Html.text "Trend: "
-                            Html.strong overview.Trend
+                            Html.span [
+                                prop.className "trend-label"
+                                prop.text "Trend: "
+                            ]
+                            Html.span overview.Trend
                         ]
                     ]
                     Html.div [
                         prop.className "candidates"
                         prop.children [
+                            Html.span [
+                                prop.className "candidates-label"
+                                prop.text "Candidates: "
+                            ]
                             for candidate in overview.Candidates do
                                 Html.span [
                                     prop.className "chip"
@@ -245,12 +288,12 @@ module App =
                     prop.children [
                         Html.span [
                             prop.className "run-time"
-                            prop.text (runResult.StartTime.ToString("yyyy-MM-dd HH:mm:ss"))
+                            prop.text (formatTimestamp runResult.StartTime)
                         ]
                         Html.span [
                             prop.className "run-duration"
                             prop.text
-                                $"{formatDuration runResult.StartTime runResult.EndTime} (m:ss)"
+                                (formatDuration runResult.StartTime runResult.EndTime)
                         ]
                     ]
                 ]
@@ -287,7 +330,7 @@ module App =
                 Html.div [
                     prop.className "refresh-note"
                     prop.text
-                        $"This page refreshes automatically every \
+                        $"Results refresh automatically every \
                             {refreshInterval.TotalHours} hour(s)."
                 ]
                 match state with
@@ -298,7 +341,7 @@ module App =
                                 prop.text "No results yet."
                             ]
                         else
-                            for result in results do
+                            for result in Array.rev results do   // most recent first
                                 renderRun result
                     | Error message ->
                         Html.div [
@@ -308,13 +351,8 @@ module App =
             ]
         ]
 
-        // reload the page periodically to fetch the latest results
-    window.setTimeout(
-        (fun _ -> window.location.reload()),
-        int refreshInterval.TotalMilliseconds)
-        |> ignore
-
     Program.mkProgram init update render
+        |> Program.withSubscription subscribe
         |> Program.withReactSynchronous "elmish-app"
         |> Program.withConsoleTrace
         |> Program.run

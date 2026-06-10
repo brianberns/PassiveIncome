@@ -151,12 +151,25 @@ body {
 
 .trend {
     margin-bottom: 8px;
+    line-height: 1.5;
+    color: var(--gray);
+}
+
+.trend-label {
+    font-weight: 600;
+    color: var(--text);
 }
 
 .candidates {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
+}
+
+.candidates-label {
+    font-weight: 600;
+    color: var(--text);
 }
 
 .chip {
