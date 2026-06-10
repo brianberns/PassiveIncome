@@ -18,6 +18,8 @@
     <Compile Include="..\..\..\StockTradingBot\Run.fs" />
     <Compile Include="..\..\StockTradingBotServer\Shared.fs" />
     <Compile Include="Remoting.fs" />
+    <Compile Include="Message.fs" />
+    <Compile Include="View.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
