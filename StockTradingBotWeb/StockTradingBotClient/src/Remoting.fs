@@ -1,5 +1,6 @@
 namespace StockTradingBot
 
+open Browser.Dom
 open Fable.Remoting.Client
 
 module Remoting =
@@ -17,6 +18,9 @@ module Remoting =
     let getResults () =
         async {
             match! Async.Catch(api.GetResults ()) with
-                | Choice1Of2 results -> return results
-                | Choice2Of2 exn -> return failwith exn.Message
+                | Choice1Of2 results ->
+                    return Ok results
+                | Choice2Of2 exn ->
+                    console.log(exn.Message)
+                    return Error exn.Message
         }

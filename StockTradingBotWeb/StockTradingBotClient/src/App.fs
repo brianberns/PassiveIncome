@@ -8,22 +8,21 @@ open Elmish.React
 
 module App =
 
-    type State = RunResult[]
+    type State = Result<RunResult[], string>
 
-    type Msg =
-        | ResultsReceived of RunResult[]
+    type Msg = Update of State
 
     let init () =
         let cmd =
             Cmd.OfAsync.perform
                 Remoting.getResults
                 ()
-                ResultsReceived
-        Array.empty, cmd
+                Update
+        Ok (Array.empty), cmd
 
     let update msg (state : State) =
         match msg with
-            | ResultsReceived results ->
+            | Update results ->
                 Browser.Dom.console.log($"Results: {results}")
                 results, Cmd.none
 
@@ -282,14 +281,21 @@ module App =
                     prop.className "app-title"
                     prop.text "Stock Trading Bot"
                 ]
-                if Array.isEmpty state then
-                    Html.div [
-                        prop.className "muted"
-                        prop.text "No results yet."
-                    ]
-                else
-                    for result in state do
-                        renderRun result
+                match state with
+                    | Ok results ->
+                        if Array.isEmpty results then
+                            Html.div [
+                                prop.className "muted"
+                                prop.text "No results yet."
+                            ]
+                        else
+                            for result in results do
+                                renderRun result
+                    | Error message ->
+                        Html.div [
+                            prop.className "error"
+                            prop.text message
+                        ]
             ]
         ]
 
