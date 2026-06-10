@@ -16,7 +16,7 @@
     <PackageReference Include="Alpaca.Markets" Version="7.2.0" />
     <PackageReference Include="FSharp.Control.AsyncSeq" Version="4.15.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
@@ -24,6 +24,7 @@
     <PackageReference Include="Suave" Version="3.2.3">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
+    <PackageReference Include="System.ServiceModel.Syndication" Version="10.0.9" />
     <PackageReference Update="FSharp.Core">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>

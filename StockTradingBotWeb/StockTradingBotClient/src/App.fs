@@ -4,27 +4,6 @@ open Feliz
 open Elmish
 open Elmish.React
 
-module Remoting =
-
-    open Fable.Remoting.Client
-
-    /// Prefix routes with /StockTradingBot.
-    let routeBuilder typeName methodName = 
-        sprintf "/StockTradingBot/%s/%s" typeName methodName
-
-    /// Server API.
-    let api =
-        Remoting.createApi()
-            |> Remoting.withRouteBuilder routeBuilder
-            |> Remoting.buildProxy<IStockTradingBotApi>
-
-    let getResults () =
-        async {
-            match! Async.Catch(api.GetResults ()) with
-                | Choice1Of2 results -> return results
-                | Choice2Of2 exn -> return failwith exn.Message
-        }
-
 module App =
 
     type State = RunResult[]
@@ -45,11 +24,11 @@ module App =
             | ResultsReceived results ->
                 results, Cmd.none
 
-    let render state (dispatch : Msg -> unit) =
+    let render (state : State) (dispatch : Msg -> unit) =
         Html.div [
-            for runResult in state do
+            for result in state do
                 Html.div [
-                    prop.text "Result"
+                    prop.text $"Result: {result.StartTime}"
                 ]
         ]
 

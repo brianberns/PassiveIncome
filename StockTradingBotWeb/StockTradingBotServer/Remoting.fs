@@ -19,8 +19,20 @@ module Api =
         async {
             for result in Run.runLoop context delay do
                 lock runResults (fun () ->
-                    printfn $"{result.StartTime}"
+                    printfn $"Result start time: {result.StartTime}"
                     runResults.Add(result))
+        }
+
+    let runLoopDummy (context : RunContext) =
+        async {
+            let result =
+                RunResult.createWithoutRecommendation
+                    DateTimeOffset.Now
+                    None
+                    None
+                    DateTimeOffset.Now
+            lock runResults (fun () ->
+                runResults.Add(result))
         }
 
     /// Settings.
@@ -34,7 +46,7 @@ module Api =
             Model = Model.gemini
             CreateBroker = Alpaca.createBroker
 #endif
-            Run = runLoop
+            Run = runLoopDummy
         |}
 
     /// Run context.
@@ -64,7 +76,7 @@ module Api =
 
     /// Stock trading bot API.
     let stockTradingBotApi (dir : string) =
-        runLoop context |> Async.Start
+        settings.Run context |> Async.Start
         {
             GetResults =
                 fun () ->
