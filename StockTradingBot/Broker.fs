@@ -12,7 +12,7 @@ type FilledOrderDetail =
 
     /// Total price.
     member detail.TotalPrice =
-        detail.FilledQuantity * detail.AverageFillPrice
+        detail.AverageFillPrice * detail.FilledQuantity   // Money on the left so Fable dispatches to Money's (*) operator
 
 module FilledOrderDetail =
 

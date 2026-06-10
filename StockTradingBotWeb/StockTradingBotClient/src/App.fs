@@ -2,11 +2,16 @@ namespace StockTradingBot
 
 open System
 
+open Browser.Dom
+
 open Feliz
 open Elmish
 open Elmish.React
 
 module App =
+
+    /// How often to automatically refresh the page.
+    let private refreshInterval = TimeSpan.FromHours(1.0)
 
     type State = Result<RunResult[], string>
 
@@ -279,6 +284,12 @@ module App =
                     prop.className "app-title"
                     prop.text "Stock Trading Bot"
                 ]
+                Html.div [
+                    prop.className "refresh-note"
+                    prop.text
+                        $"This page refreshes automatically every \
+                            {refreshInterval.TotalHours} hour(s)."
+                ]
                 match state with
                     | Ok results ->
                         if Array.isEmpty results then
@@ -296,6 +307,12 @@ module App =
                         ]
             ]
         ]
+
+        // reload the page periodically to fetch the latest results
+    window.setTimeout(
+        (fun _ -> window.location.reload()),
+        int refreshInterval.TotalMilliseconds)
+        |> ignore
 
     Program.mkProgram init update render
         |> Program.withReactSynchronous "elmish-app"
