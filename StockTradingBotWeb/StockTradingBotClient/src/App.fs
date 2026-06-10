@@ -22,9 +22,7 @@ module App =
 
     let update msg (state : State) =
         match msg with
-            | Update results ->
-                Browser.Dom.console.log($"Results: {results}")
-                results, Cmd.none
+            | Update state -> state, Cmd.none
 
     /// Formats a quantity of shares.
     let private formatQty (quantity : decimal) =
@@ -106,7 +104,7 @@ module App =
                         ]
                     ]
                 | Error message ->
-                    errorRow $"Error: {message}"
+                    errorRow $"Error: %s{message}"
         ]
 
     /// Renders a market overview.
