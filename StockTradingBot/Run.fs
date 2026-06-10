@@ -9,7 +9,7 @@ type OrderResult =
         Asset : Asset
 
         /// Result of trade.
-        Result : Result<FilledOrderDetail, exn>
+        Result : Result<FilledOrderDetail, string (*messgae*)>
     }
 
 module OrderResult =
@@ -28,7 +28,7 @@ type RunResult =
         StartTime : DateTimeOffset
         
         /// Portfolio at start of run.
-        PortfolioResultOpt : Option<Result<Portfolio, exn>>
+        PortfolioResultOpt : Option<Result<Portfolio, string>>
 
         /// Market overview.
         MarketOverviewResultOpt : Option<MarketOverviewResult>

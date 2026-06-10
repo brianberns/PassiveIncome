@@ -1,6 +1,28 @@
 ﻿namespace StockTradingBot
 
 open System
+
+/// News feed error.
+type NewsFeedError =
+    {
+        /// News feed name.
+        FeedName : string
+
+        /// Error message.
+        Message : string
+    }
+
+module NewsFeedError =
+
+    /// Creates a news feed error.
+    let create feedName message =
+        {
+            FeedName = feedName
+            Message = message
+        }
+
+#if !FABLE_COMPILER
+
 open System.IO
 open System.Net.Http
 open System.ServiceModel.Syndication
@@ -65,5 +87,10 @@ module NewsFeed =
                             item
                 |]
             with exn ->
-                return Error (newsFeed.Name, exn)
+                let error =
+                    NewsFeedError.create
+                        newsFeed.Name exn.Message
+                return Error error
         } |> Async.AwaitTask
+
+#endif

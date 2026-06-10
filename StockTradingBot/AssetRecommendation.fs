@@ -23,10 +23,13 @@ type AssetRecommendation =
 type AssetRecommendationResult =
 
     /// Agent succeeded, but some assets might have a problem.
-    | Success of Result<AssetRecommendation, (Asset * exn)>[]
+    | Success of
+        Result<
+            AssetRecommendation,
+            (Asset * string (*error message*))>[]
 
     /// Agent request failed.
-    | AgentError of exn
+    | AgentError of string (*error message*)
 
 module AssetRecommendation =
 
@@ -137,9 +140,9 @@ module AssetRecommendation =
                     | Some [| reco |] ->
                         Ok reco
                     | Some _ ->
-                        Error (cand.Asset, exn("Conflicting recommendations"))
+                        Error (cand.Asset, "Conflicting recommendations")
                     | None ->
-                        Error (cand.Asset, exn("Missing recommendation"))
+                        Error (cand.Asset, "Missing recommendation")
         |]
 
     /// Determines asset recommendations from the given market
@@ -156,8 +159,8 @@ module AssetRecommendation =
                 // news feed errors for some assets don't prevent success for other assets
             let feedErrorResults =
                 [|
-                    for cand, (_, exn) in candErrors do
-                        Error (cand.Asset, exn)
+                    for cand, error in candErrors do
+                        Error (cand.Asset, error.Message)
                 |]
 
                 // get recommendations

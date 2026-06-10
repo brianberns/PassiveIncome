@@ -9,6 +9,7 @@
     <DefineConstants>TRACE;FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\StockTradingBot\NewsFeed.fs" />
     <Compile Include="..\..\..\StockTradingBot\Money.fs" />
     <Compile Include="..\..\..\StockTradingBot\Portfolio.fs" />
     <Compile Include="..\..\..\StockTradingBot\Broker.fs" />

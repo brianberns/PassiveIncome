@@ -45,7 +45,7 @@ module Alpaca =
 
                 return Ok (Portfolio.create cash positionMap)
             with exn ->
-                return Error exn
+                return Error exn.Message
         } |> Async.AwaitTask
 
     /// Is the market currently open?
@@ -55,7 +55,7 @@ module Alpaca =
                 let! clock = api.TradingClient.GetClockAsync()
                 return Ok clock.IsOpen
             with exn ->
-                return Error exn
+                return Error exn.Message
         } |> Async.AwaitTask
 
     /// Waits a while (but not forever) for the given order
@@ -109,13 +109,12 @@ module Alpaca =
                     | Ok detail ->
                         return Ok detail
                     | Error statusOpt ->
-                        let msg =
-                            statusOpt
-                                |> Option.map string
-                                |> Option.defaultValue "Unknown"
-                        return Error (exn(msg))
+                        return statusOpt
+                            |> Option.map string
+                            |> Option.defaultValue "Unknown"
+                            |> Error
             with exn ->
-                return Error exn
+                return Error exn.Message
         } |> Async.AwaitTask
 
     /// Sells the given quantity of the given asset.
@@ -178,5 +177,5 @@ module AlpacaDummy =
                     }
             Buy =
                 fun asset spend ->
-                    async { return Error (exn "Dummy") }
+                    async { return Error "Dummy" }
         }

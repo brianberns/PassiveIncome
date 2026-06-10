@@ -1,7 +1,5 @@
 namespace StockTradingBot
 
-open System
-
 module Array =
 
     /// Not provided in older versions of FSharp.Core.
@@ -56,10 +54,10 @@ type MarketOverviewResult =
     | Success of MarketOverview
 
     /// News feed errors occurred prior to agent request.
-    | FeedErrors of (string (*feed name*) * exn)[]
+    | FeedErrors of NewsFeedError[]
 
     /// Agent request failed.
-    | AgentError of exn
+    | AgentError of string (*error message*)
 
 module MarketOverview =
 
@@ -72,6 +70,7 @@ module MarketOverview =
 
 #if !FABLE_COMPILER
 
+    open System
     open System.ServiceModel.Syndication
 
     /// The given item relates to personal finance, rather than
@@ -165,7 +164,7 @@ module MarketOverview =
                 // process result
             match result with
                 | Ok overview -> return Success overview
-                | Error exn ->  return AgentError exn
+                | Error message -> return AgentError message
         }
 
     /// Determines the current market overview:

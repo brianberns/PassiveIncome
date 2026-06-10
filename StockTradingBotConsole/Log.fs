@@ -15,8 +15,8 @@ module Log =
                         {value.CurrentPrice}/share = {value.Value}"
                 printfn $"   Cash: {portfolio.TradableCash}"
                 printfn $"   Total value: {portfolio.TotalValue}"
-            | Error (exn : exn) ->
-                printfn $"   Error: {exn.Message}"
+            | Error message ->
+                printfn $"   Error: %s{message}"
 
     /// Logs a market overview.
     let private logMarketOverview result =
@@ -31,10 +31,10 @@ module Log =
                         |> String.concat ", "
                 printfn $"Candidates: {candidates}"
             | FeedErrors errors ->
-                for feedName, exn in errors do
-                    printfn $"News feed error: {feedName}: {exn.Message}"
-            | MarketOverviewResult.AgentError exn ->
-                printfn $"Agent error: {exn.Message}"
+                for error in errors do
+                    printfn $"News feed error: {error.FeedName}: {error.Message}"
+            | MarketOverviewResult.AgentError message ->
+                printfn $"Agent error: {message}"
 
     /// Logs asset recommendations.
     let private logAssetRecommendations result =
@@ -48,12 +48,12 @@ module Log =
                             printfn ""
                             printfn $"{reco.Asset.Symbol}: {reco.Action}"
                             printfn $"{reco.Reason}"
-                        | Error (asset : Asset, exn : exn) ->
+                        | Error (asset : Asset, message) ->
                             printfn ""
-                            printfn $"Asset error: {asset}: {exn.Message}"
-            | AssetRecommendationResult.AgentError exn ->
+                            printfn $"Asset error: {asset}: {message}"
+            | AssetRecommendationResult.AgentError message ->
                 printfn ""
-                printfn $"Agent error: {exn.Message}"
+                printfn $"Agent error: {message}"
 
     /// Logs asset orders.
     let private logAssetOrders sellResults buyResults =
@@ -68,16 +68,16 @@ module Log =
                         printfn $"   Sold %.3f{detail.FilledQuantity} shares of \
                             {sellResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
-                    | Error exn ->
-                        printfn $"   Sell error: {sellResult.Asset}: {exn.Message}"
+                    | Error message ->
+                        printfn $"   Sell error: {sellResult.Asset}: {message}"
             for (buyResult : OrderResult) in buyResults do
                 match buyResult.Result with
                     | Ok detail ->
                         printfn $"   Bought %.3f{detail.FilledQuantity} shares of \
                             {buyResult.Asset} @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
-                    | Error exn ->
-                        printfn $"   Buy error: {buyResult.Asset}: {exn.Message}"
+                    | Error message ->
+                        printfn $"   Buy error: {buyResult.Asset}: {message}"
         else
             printfn "   None"
 

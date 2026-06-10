@@ -28,7 +28,7 @@ module Api =
             let result =
                 RunResult.createWithoutRecommendation
                     DateTimeOffset.Now
-                    None
+                    (Some (Ok (Portfolio.create (Usd 123.4m) Map.empty)))
                     None
                     DateTimeOffset.Now
             lock runResults (fun () ->
@@ -46,7 +46,7 @@ module Api =
             Model = Model.gemini
             CreateBroker = Alpaca.createBroker
 #endif
-            Run = runLoopDummy
+            Run = runLoop
         |}
 
     /// Run context.
