@@ -65,5 +65,5 @@ module NewsFeed =
                             item
                 |]
             with exn ->
-                return Error (newsFeed, exn)
+                return Error (newsFeed.Name, exn)
         } |> Async.AwaitTask

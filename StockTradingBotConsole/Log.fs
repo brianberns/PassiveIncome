@@ -31,8 +31,8 @@ module Log =
                         |> String.concat ", "
                 printfn $"Candidates: {candidates}"
             | FeedErrors errors ->
-                for feed, exn in errors do
-                    printfn $"News feed error: {feed.Name}: {exn.Message}"
+                for feedName, exn in errors do
+                    printfn $"News feed error: {feedName}: {exn.Message}"
             | MarketOverviewResult.AgentError exn ->
                 printfn $"Agent error: {exn.Message}"
 

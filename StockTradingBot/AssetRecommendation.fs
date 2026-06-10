@@ -1,8 +1,5 @@
 namespace StockTradingBot
 
-open System
-open System.ServiceModel.Syndication
-
 /// Actions we can take on an asset.
 type AssetAction =
     | Buy = 0   // must be a .NET enum for serialization
@@ -40,6 +37,11 @@ module AssetRecommendation =
             Action = action
             Reason = reason
         }
+
+#if !FABLE_COMPILER
+
+    open System
+    open System.ServiceModel.Syndication
 
     /// Gets a news feed specific to the given asset.
     let private getFeed utcNow asset =
@@ -173,3 +175,5 @@ module AssetRecommendation =
                 | Error exn ->
                     return AgentError exn
         }
+
+#endif

@@ -9,6 +9,12 @@
     <DefineConstants>TRACE;FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\StockTradingBot\Money.fs" />
+    <Compile Include="..\..\..\StockTradingBot\Portfolio.fs" />
+    <Compile Include="..\..\..\StockTradingBot\Broker.fs" />
+    <Compile Include="..\..\..\StockTradingBot\MarketOverview.fs" />
+    <Compile Include="..\..\..\StockTradingBot\AssetRecommendation.fs" />
+    <Compile Include="..\..\..\StockTradingBot\Run.fs" />
     <Compile Include="..\..\StockTradingBotServer\Shared.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>

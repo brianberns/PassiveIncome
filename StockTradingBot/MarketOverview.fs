@@ -1,7 +1,6 @@
 namespace StockTradingBot
 
 open System
-open System.ServiceModel.Syndication
 
 module Array =
 
@@ -57,7 +56,7 @@ type MarketOverviewResult =
     | Success of MarketOverview
 
     /// News feed errors occurred prior to agent request.
-    | FeedErrors of (NewsFeed * exn)[]
+    | FeedErrors of (string (*feed name*) * exn)[]
 
     /// Agent request failed.
     | AgentError of exn
@@ -70,6 +69,10 @@ module MarketOverview =
             Trend = trend
             Candidates = candidates
         }
+
+#if !FABLE_COMPILER
+
+    open System.ServiceModel.Syndication
 
     /// The given item relates to personal finance, rather than
     /// investing.
@@ -182,3 +185,5 @@ module MarketOverview =
             else
                 return! getOverview agent utcNow itemArrays
         }
+
+#endif

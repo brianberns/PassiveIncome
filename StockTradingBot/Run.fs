@@ -5,38 +5,6 @@ open System.Net.Http
 
 open FSharp.Control
 
-(*
- * Steps in a run:
- *    1. Check if market is open.
- *    2. Get current portfolio.
- *    3. Get market overview.
- *    4. Create recommendations from market overview.
- *    5. Place trades based on those recommendations.
- *)
-
-/// Context need to run.
-type RunContext =
-    {
-        /// HTTP client for fetching news feeds.
-        HttpClient : HttpClient
-
-        /// Decision-making agent.
-        Agent : Agent
-
-        /// Broker for buying/selling assets.
-        Broker : Broker
-    }
-
-module RunContext =
-
-    /// Creates a run context.
-    let create httpClient agent broker =
-        {
-            HttpClient = httpClient
-            Agent = agent
-            Broker = broker
-        }
-
 /// Result of placing an order.
 type OrderResult =
     {
@@ -122,6 +90,40 @@ module RunResult =
             portfolioResultOpt
             None
             endTime
+
+#if !FABLE_COMPILER
+
+(*
+ * Steps in a run:
+ *    1. Check if market is open.
+ *    2. Get current portfolio.
+ *    3. Get market overview.
+ *    4. Create recommendations from market overview.
+ *    5. Place trades based on those recommendations.
+ *)
+
+/// Context need to run.
+type RunContext =
+    {
+        /// HTTP client for fetching news feeds.
+        HttpClient : HttpClient
+
+        /// Decision-making agent.
+        Agent : Agent
+
+        /// Broker for buying/selling assets.
+        Broker : Broker
+    }
+
+module RunContext =
+
+    /// Creates a run context.
+    let create httpClient agent broker =
+        {
+            HttpClient = httpClient
+            Agent = agent
+            Broker = broker
+        }
 
 module Run =
 
@@ -322,3 +324,5 @@ module Run =
                 yield result
                 do! Async.Sleep(delay : TimeSpan)
         }
+
+#endif
