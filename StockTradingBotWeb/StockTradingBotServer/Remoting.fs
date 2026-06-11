@@ -49,8 +49,8 @@ module Api =
             Run = runLoop
         |}
 
-    /// Run context.
-    let context =
+    /// Creates a run context, reading secrets from the web part's directory.
+    let createContext dir =
 
         /// HTTP client for fetching news feeds.
         let httpClient =
@@ -63,7 +63,9 @@ module Api =
         /// Program configuration.
         let config =
             ConfigurationBuilder()
-                .AddUserSecrets(typeof<RunContext>.Assembly)
+                .SetBasePath(dir)                              // web part's own directory
+                .AddUserSecrets(typeof<RunContext>.Assembly)   // local development
+                .AddJsonFile("secrets.json", optional = true)  // hosted deployment (e.g. Everleap)
                 .Build()
 
         /// Decision-making agent.
@@ -75,8 +77,10 @@ module Api =
         RunContext.create httpClient agent broker
 
     /// Stock trading bot API.
-    let stockTradingBotApi (dir : string) =
-        settings.Run context |> Async.Start
+    let stockTradingBotApi dir =
+        createContext dir
+            |> settings.Run
+            |> Async.Start
         {
             GetResults =
                 fun () ->
