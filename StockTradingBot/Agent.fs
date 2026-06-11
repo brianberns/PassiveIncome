@@ -109,5 +109,5 @@ module Agent =
                                 agent.Model.SupportsJsonSchema)
                 return Ok response.Result
             with exn ->
-                return Error exn.Message
+                return Error exn.FullMessage
         } |> Async.AwaitTask
