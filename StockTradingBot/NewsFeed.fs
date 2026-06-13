@@ -27,19 +27,6 @@ open System.Net.Http
 open System.ServiceModel.Syndication
 open System.Xml
 
-[<AutoOpen>]
-module ExceptionExt =
-
-    type Exception with
-
-        /// Gets full message, including inner exception.
-        member exn.FullMessage =
-            String.concat Environment.NewLine [
-                exn.Message
-                if exn.InnerException <> null then
-                    exn.InnerException.FullMessage
-            ]
-
 /// Filters items from a news feed.
 type NewsItemFilter = SyndicationItem -> bool
 
@@ -101,7 +88,7 @@ module NewsFeed =
             with exn ->
                 let error =
                     NewsFeedError.create
-                        newsFeed.Name exn.FullMessage
+                        newsFeed.Name exn.Message
                 return Error error
         } |> Async.AwaitTask
 
