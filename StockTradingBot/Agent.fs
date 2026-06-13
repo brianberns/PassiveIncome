@@ -12,6 +12,9 @@ open OpenAI
 /// Chat model.
 type Model =
     {
+        /// Model name.
+        Name : string
+
         /// Model ID.
         Id : string
 
@@ -32,6 +35,7 @@ module Model =
     /// Google Gemini.
     let gemini =
         {
+            Name = "Gemini"
             Id = "gemini-3.5-flash"
             ApiKeyName = "Gemini:ApiKey"
             Endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -41,6 +45,7 @@ module Model =
     /// Groq.
     let groq =
         {
+            Name = "Groq"
             Id = "llama-3.3-70b-versatile"
             ApiKeyName = "Groq:ApiKey"
             Endpoint = "https://api.groq.com/openai/v1"
@@ -50,6 +55,7 @@ module Model =
     /// OpenRouter.
     let openRouter =
         {
+            Name = "OpenRouter"
             Id = "openrouter/owl-alpha"
             ApiKeyName = "OpenRouter:ApiKey"
             Endpoint = "https://openrouter.ai/api/v1"
