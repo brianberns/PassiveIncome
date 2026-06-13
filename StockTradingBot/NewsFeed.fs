@@ -1,5 +1,34 @@
 ﻿namespace StockTradingBot
 
+open System
+
+/// One item in a news feed.
+type NewsItem =
+    {
+        /// Unique identifier.
+        Id : string
+
+        /// Date of publication.
+        PublishDate : DateTimeOffset
+
+        /// Item title.
+        Title : string
+
+        /// Item summary.
+        Summary : string
+    }
+
+module NewsItem =
+
+    /// Creates a news item.
+    let create id publishDate title summary =
+        {
+            Id = id
+            PublishDate = publishDate
+            Title = title
+            Summary = summary
+        }
+
 /// News feed error.
 type NewsFeedError =
     {
@@ -21,7 +50,6 @@ module NewsFeedError =
 
 #if !FABLE_COMPILER
 
-open System
 open System.IO
 open System.Net.Http
 open System.ServiceModel.Syndication
@@ -82,8 +110,11 @@ module NewsFeed =
                             Seq.forall (fun filter ->
                                 filter item) newsFeed.Filters
                         if keep then
-                            item.SourceFeed <- feed   // ick
-                            item
+                            NewsItem.create
+                                item.Id
+                                item.PublishDate
+                                item.Title.Text
+                                item.Summary.Text
                 |]
             with exn ->
                 let error =

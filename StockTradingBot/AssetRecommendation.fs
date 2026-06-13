@@ -70,10 +70,10 @@ module AssetRecommendation =
                 ""
                 $"Asset: {candidate.Asset.Symbol}"
                 $"Rationale: {candidate.Reason}"
-                for (item : SyndicationItem) in items do
+                for item in items do
                     ""
-                    $"Title: {item.Title.Text}"
-                    $"Summary: {item.Summary.Text}"
+                    $"Title: {item.Title}"
+                    $"Summary: {item.Summary}"
                     let hours =
                         let age = utcNow - item.PublishDate.UtcDateTime
                         Math.Round(age.TotalHours, 1)
@@ -113,9 +113,10 @@ module AssetRecommendation =
             let prompt =
                 candItemArrays
                     |> Seq.map (
-                        fun (cand : Candidate, items : SyndicationItem[]) ->
+                        fun (cand : Candidate, items) ->
                             cand,
-                            items |> Seq.sortByDescending _.PublishDate)
+                            items
+                                |> Seq.sortByDescending _.PublishDate)
                     |> getPrompt utcNow marketTrend
             return!
                 Agent.getResultAsync<AssetRecommendation[]>

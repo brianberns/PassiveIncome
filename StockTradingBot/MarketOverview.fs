@@ -122,10 +122,10 @@ module MarketOverview =
             collectively suggest, and b) the specific US stock symbols that \
             are most directly affected and worth a closer look. Return ONLY \
             ticker symbols (not company names) for liquid US equities."
-            for (item : SyndicationItem) in items do
+            for item in items do
                 ""
-                $"Title: {item.Title.Text}"
-                $"Summary: {item.Summary.Text}"
+                $"Title: {item.Title}"
+                $"Summary: {item.Summary}"
                 let hours =
                     let age = utcNow - item.PublishDate.UtcDateTime
                     Math.Round(age.TotalHours, 1)
@@ -149,7 +149,7 @@ module MarketOverview =
         }
 
     /// Determines market overview from the given news items.
-    let private getOverview agent utcNow (itemArrays : SyndicationItem[][]) =
+    let private getOverview agent utcNow (itemArrays : NewsItem[][]) =
         async {
                 // query agent
             let! result =
