@@ -23,22 +23,26 @@ module FilledOrderDetail =
             FilledQuantity = filledQuantity
         }
 
+/// Resullt from buying/selling an asset.
+type TradeResult =
+    Result<FilledOrderDetail, string (*message*)>
+
 /// Broker for buying/selling assets.
 type Broker =
     {
         /// Gets the current portfolio.
-        GetPortfolio : unit -> Async<Result<Portfolio, string (*message*)>>
+        GetPortfolio :
+            unit -> Async<Result<Portfolio, string (*message*)>>
 
         /// Is the market currently open?
-        IsMarketOpen : unit -> Async<Result<bool, string (*message*)>>
+        IsMarketOpen :
+            unit -> Async<Result<bool, string (*message*)>>
 
         /// Sells the given quantity of the given asset.
         Sell :
-            Asset -> decimal (*quantity*)
-                -> Async<Result<FilledOrderDetail, string (*message*)>>
+            Asset -> decimal (*quantity*) -> Async<TradeResult>
 
         /// Buys the given asset with the given money.
         Buy :
-            Asset -> Money (*total spend*)
-                -> Async<Result<FilledOrderDetail, string (*message*)>>
-    }
+            Asset -> Money (*total spend*) -> Async<TradeResult>
+}

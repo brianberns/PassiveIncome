@@ -2,7 +2,7 @@
 
 open System
 
-/// One item in a news feed.
+/// An item in a news feed.
 type NewsItem =
     {
         /// Unique identifier.
