@@ -102,7 +102,7 @@ module MarketOverview =
             "As a savvy stock trader, scan the news items below for relevant, \
             timely information. Identify a) the broad market/sector trend these \
             items collectively suggest, and b) the specific US stock symbols \
-            that are most directly affected. Return ONLY ticker symbols (not \
+            that are most affected by the news. Return ONLY ticker symbols (not \
             company names) for liquid US equities."
             for item in newsItems do
                 ""
