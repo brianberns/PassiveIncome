@@ -6,14 +6,19 @@ type AssetAction =
     | Sell = 1
     | Hold = 2
 
+/// News items about a specific candidate asset.
 type CandidateNews =
     {
+        /// Candidate asset.
         Candidate : Candidate
+
+        /// News items.
         NewsItems : NewsItem[]
     }
 
 module CandidateNews =
 
+    /// Creates a candidate news.
     let create candidate newsItems =
         {
             Candidate = candidate
