@@ -27,7 +27,7 @@ module View =
             (endTime - startTime).TotalSeconds |> round |> int
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
-        $"Bot ran for {minutes} minutes, {seconds} seconds"
+        $"Bot ran for {minutes} min., {seconds} sec."
 
     /// A titled section within a run card.
     let private section title children =
@@ -164,7 +164,10 @@ module View =
                                 prop.className "candidates-label"
                                 prop.text "Candidates: "
                             ]
-                            for candidate in overview.Candidates do
+                            let candidates =
+                                overview.Candidates
+                                    |> Seq.sortBy _.Asset.Symbol
+                            for candidate in candidates do
                                 Html.span [
                                     prop.className "chip"
                                     prop.title candidate.Reason
@@ -193,6 +196,11 @@ module View =
         section "Recommendations" [
             match result with
                 | AssetRecommendationResult.Success results ->
+                    let results =
+                        results
+                            |> Seq.sortBy (function
+                                | Ok (_, reco) -> reco.Asset.Symbol
+                                | Error (asset, _) -> asset.Symbol)
                     for result in results do
                         match result with
                             | Ok (newsItems, reco) ->
