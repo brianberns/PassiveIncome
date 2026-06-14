@@ -101,9 +101,8 @@ module MarketOverview =
         String.concat "\n" [
             "As a savvy stock trader, scan the items below for relevant, \
             timely news. Identify a) the broad market/sector trend suggested \
-            by the news, and b) the specific US companies that are most \
-            directly affected by the news (while ignoring companies that \
-            are merely mentioned). Return ONLY ticker symbols (not company \
+            by the news, and b) the specific US companies that are directly \
+            affected by the news. Return ONLY ticker symbols (not company \
             names) for liquid US equities."
             for item in newsItems do
                 ""
