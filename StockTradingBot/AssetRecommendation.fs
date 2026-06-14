@@ -6,6 +6,20 @@ type AssetAction =
     | Sell = 1
     | Hold = 2
 
+type CandidateNews =
+    {
+        Candidate : Candidate
+        NewsItems : NewsItem[]
+    }
+
+module CandidateNews =
+
+    let create candidate newsItems =
+        {
+            Candidate = candidate
+            NewsItems = newsItems
+        }
+
 /// Recommended action for an asset.
 type AssetRecommendation =
     {
@@ -25,7 +39,7 @@ type AssetRecommendationResult =
     /// Agent succeeded, but some assets might have a problem.
     | Success of
         Result<
-            AssetRecommendation,
+            NewsItem[] * AssetRecommendation,
             (Asset * string (*error message*))>[]
 
     /// Agent request failed.
@@ -44,7 +58,6 @@ module AssetRecommendation =
 #if !FABLE_COMPILER
 
     open System
-    open System.ServiceModel.Syndication
 
     /// Gets a news feed specific to the given asset.
     let private getFeed utcNow asset =
@@ -57,20 +70,20 @@ module AssetRecommendation =
             ]
 
     /// Creates a prompt for the given candidate assets.
-    let private getPrompt utcNow marketTrend candidateNews =
+    let private getPrompt utcNow marketTrend candidateNewses =
         String.concat "\n" [
             "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
             each stock symbol listed below based on its rationale, its detailed \
             news items, and the overall market trend."
             ""
             $"Trend: %s{marketTrend}"
-            for (candidate : Candidate, items : seq<_>) in candidateNews do
+            for candNews in candidateNewses do
                 ""
                 "###################"
                 ""
-                $"Asset: {candidate.Asset.Symbol}"
-                $"Rationale: {candidate.Reason}"
-                for item in items do
+                $"Asset: {candNews.Candidate.Asset.Symbol}"
+                $"Rationale: {candNews.Candidate.Reason}"
+                for item in candNews.NewsItems do
                     ""
                     $"Title: {item.Title}"
                     $"Summary: {item.Summary}"
@@ -103,28 +116,27 @@ module AssetRecommendation =
             return results
                 |> Array.partitionWith (fun (cand, result) ->
                     match result with
-                        | Ok items -> Choice1Of2 (cand, items)
-                        | Error error -> Choice2Of2 (cand, error))
+                        | Ok items ->
+                            items
+                                |> Array.sortByDescending _.PublishDate
+                                |> CandidateNews.create cand
+                                |> Choice1Of2
+                        | Error error ->
+                            Choice2Of2 (cand, error))
         }
 
     /// Determines recommendations for the given candidates.
-    let getRecommendations agent utcNow marketTrend candItemArrays =
+    let getRecommendations agent utcNow marketTrend candNewses =
         async {
             let prompt =
-                candItemArrays
-                    |> Seq.map (
-                        fun (cand : Candidate, items) ->
-                            cand,
-                            items
-                                |> Seq.sortByDescending _.PublishDate)
-                    |> getPrompt utcNow marketTrend
+                getPrompt utcNow marketTrend candNewses
             return!
                 Agent.getResultAsync<AssetRecommendation[]>
                     prompt agent
         }
 
     /// Matches recommendations to the given candidates.
-    let private matchRecommendations candidates recommendations =
+    let private matchRecommendations candNewses recommendations =
 
             // prepare to lookup recommendations by asset
         let recoMap =
@@ -136,14 +148,15 @@ module AssetRecommendation =
 
             // find unique recommendation for each candidate, if it exists
         [|
-            for (cand : Candidate) in candidates do
-                match Map.tryFind cand.Asset recoMap with
+            for candNews in candNewses do
+                let asset = candNews.Candidate.Asset
+                match Map.tryFind asset recoMap with
                     | Some [| reco |] ->
-                        Ok reco
+                        Ok (candNews.NewsItems, reco)
                     | Some _ ->
-                        Error (cand.Asset, "Conflicting recommendations")
+                        Error (asset, "Conflicting recommendations")
                     | None ->
-                        Error (cand.Asset, "Missing recommendation")
+                        Error (asset, "Missing recommendation")
         |]
 
     /// Determines asset recommendations from the given market
@@ -154,7 +167,7 @@ module AssetRecommendation =
         async {
                 // get news items
             let utcNow = DateTime.UtcNow
-            let! candItemArrays, candErrors =
+            let! candNewses, candErrors =
                 getNewsItems httpClient utcNow candidates
 
                 // news feed errors for some assets don't prevent success for other assets
@@ -167,11 +180,11 @@ module AssetRecommendation =
                 // get recommendations
             let! recosResult =
                 getRecommendations
-                    agent utcNow marketTrend candItemArrays
+                    agent utcNow marketTrend candNewses
             match recosResult with
                 | Ok recos ->
                     let successResults =
-                        matchRecommendations candidates recos
+                        matchRecommendations candNewses recos
                     return Success [|
                         yield! feedErrorResults
                         yield! successResults

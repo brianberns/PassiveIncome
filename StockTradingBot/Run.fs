@@ -251,7 +251,7 @@ module Run =
                     let! sellResults, buyResults =
                         recoDetailResults
                             |> Array.choose (function
-                                | Ok reco -> Some reco
+                                | Ok (_, reco) -> Some reco
                                 | _ -> None)
                             |> placeOrders context.Broker portfolio
                     return recoResult, sellResults, buyResults
@@ -269,7 +269,7 @@ module Run =
                     context.Agent
 
             match overviewResult with
-                | MarketOverviewResult.Success overview ->
+                | MarketOverviewResult.Success (_, overview) ->
 
                         // request and act on recommendations
                     let! recoResult, sellResults, buyResults =

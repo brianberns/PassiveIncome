@@ -34,7 +34,7 @@ type MarketOverview =
 type MarketOverviewResult =
 
     /// Agent succeeded.
-    | Success of MarketOverview
+    | Success of NewsItem[] * MarketOverview
 
     /// News feed errors occurred prior to agent request.
     | FeedErrors of NewsFeedError[]
@@ -54,7 +54,6 @@ module MarketOverview =
 #if !FABLE_COMPILER
 
     open System
-    open System.ServiceModel.Syndication
 
     /// The given item relates to personal finance, rather than
     /// investing.
@@ -98,14 +97,14 @@ module MarketOverview =
         ]
 
     /// Creates a prompt for the given news items.
-    let private getPrompt utcNow items =
+    let private getPrompt utcNow newsItems =
         String.concat "\n" [
             "As a savvy stock trader, scan the news items below for timely \
             ideas. Identify a) the broad market/sector trend they \
             collectively suggest, and b) the specific US stock symbols that \
             are most directly affected and worth a closer look. Return ONLY \
             ticker symbols (not company names) for liquid US equities."
-            for item in items do
+            for item in newsItems do
                 ""
                 $"Title: {item.Title}"
                 $"Summary: {item.Summary}"
@@ -134,20 +133,25 @@ module MarketOverview =
     /// Determines market overview from the given news items.
     let private getOverview agent utcNow (itemArrays : NewsItem[][]) =
         async {
+                // gather news items
+            let items =
+                itemArrays
+                    |> Seq.concat
+                    |> Seq.distinctBy _.Id
+                    |> Seq.sortByDescending _.PublishDate
+                    |> Seq.toArray
+
                 // query agent
             let! result =
-                let prompt =
-                    itemArrays
-                        |> Seq.concat
-                        |> Seq.distinctBy _.Id
-                        |> Seq.sortByDescending _.PublishDate
-                        |> getPrompt utcNow
+                let prompt = getPrompt utcNow items
                 Agent.getResultAsync<MarketOverview> prompt agent
 
                 // process result
             match result with
-                | Ok overview -> return Success overview
-                | Error message -> return AgentError message
+                | Ok overview ->
+                    return Success (items, overview)
+                | Error message ->
+                    return AgentError message
         }
 
     /// Determines the current market overview:

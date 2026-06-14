@@ -23,13 +23,14 @@ module Log =
         printfn ""
         printfn "Market overview:"
         match result with
-            | MarketOverviewResult.Success overview ->
+            | MarketOverviewResult.Success (newsItems, overview) ->
                 printfn $"Trend: {overview.Trend}"
                 let candidates =
                     overview.Candidates
                         |> Seq.map _.Asset.Symbol
                         |> String.concat ", "
                 printfn $"Candidates: {candidates}"
+                printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
                     printfn $"News feed error: {error.FeedName}: {error.Message}"
@@ -44,10 +45,11 @@ module Log =
             | AssetRecommendationResult.Success results ->
                 for result in results do
                     match result with
-                        | Ok reco ->
+                        | Ok (newsItems, reco) ->
                             printfn ""
                             printfn $"{reco.Asset.Symbol}: {reco.Action}"
                             printfn $"{reco.Reason}"
+                            printfn $"News items: {newsItems.Length}"
                         | Error (asset : Asset, message) ->
                             printfn ""
                             printfn $"Asset error: {asset}: {message}"

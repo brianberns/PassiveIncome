@@ -105,7 +105,7 @@ module View =
     let private renderMarketOverview result =
         section "Market overview" [
             match result with
-                | MarketOverviewResult.Success overview ->
+                | MarketOverviewResult.Success (newsItems, overview) ->
                     Html.div [
                         prop.className "trend"
                         prop.children [
@@ -153,7 +153,7 @@ module View =
                 | AssetRecommendationResult.Success results ->
                     for result in results do
                         match result with
-                            | Ok reco ->
+                            | Ok (newsItems, reco) ->
                                 let label, actionClass = actionInfo reco.Action
                                 Html.div [
                                     prop.className "reco"
