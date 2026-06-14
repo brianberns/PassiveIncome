@@ -49,6 +49,47 @@ module View =
             prop.text message
         ]
 
+    /// Renders news items behind a collapsible disclosure. The items
+    /// are hidden by default and revealed when the user expands them.
+    let private renderNews (newsItems : NewsItem[]) =
+        if Array.isEmpty newsItems then
+            Html.none
+        else
+            Html.details [
+                prop.className "news"
+                prop.children [
+                    Html.summary [
+                        prop.className "news-summary"
+                        prop.text
+                            (if newsItems.Length = 1 then "1 news item"
+                             else $"{newsItems.Length} news items")
+                    ]
+                    Html.div [
+                        prop.className "news-items"
+                        prop.children [
+                            for item in newsItems do
+                                Html.div [
+                                    prop.className "news-item"
+                                    prop.children [
+                                        Html.div [
+                                            prop.className "news-title"
+                                            prop.text item.Title
+                                        ]
+                                        Html.div [
+                                            prop.className "news-date"
+                                            prop.text (formatTimestamp item.PublishDate)
+                                        ]
+                                        Html.div [
+                                            prop.className "news-item-summary"
+                                            prop.text item.Summary
+                                        ]
+                                    ]
+                                ]
+                        ]
+                    ]
+                ]
+            ]
+
     /// Renders a portfolio.
     let private renderPortfolio result =
         section "Portfolio" [
@@ -131,6 +172,7 @@ module View =
                                 ]
                         ]
                     ]
+                    renderNews newsItems
                 | FeedErrors errors ->
                     for error in errors do
                         errorRow $"News feed error: {error.FeedName}: {error.Message}"
@@ -175,6 +217,7 @@ module View =
                                             prop.className "reco-reason"
                                             prop.text reco.Reason
                                         ]
+                                        renderNews newsItems
                                     ]
                                 ]
                             | Error (asset : Asset, message : string) ->
