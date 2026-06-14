@@ -111,6 +111,7 @@ module Agent =
                         .GetResponseAsync<'t>(
                             agent.ChatClient,
                             prompt,
+                            ChatOptions(Temperature = 0f),   // most deterministic,
                             useJsonSchemaResponseFormat =
                                 agent.Model.SupportsJsonSchema)
                 return Ok response.Result
