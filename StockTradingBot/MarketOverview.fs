@@ -99,11 +99,11 @@ module MarketOverview =
     /// Creates a prompt for the given news items.
     let private getPrompt utcNow newsItems =
         String.concat "\n" [
-            "As a savvy stock trader, scan the news items below for timely \
-            ideas. Identify a) the broad market/sector trend they \
-            collectively suggest, and b) the specific US stock symbols that \
-            are most directly affected and worth a closer look. Return ONLY \
-            ticker symbols (not company names) for liquid US equities."
+            "As a savvy stock trader, scan the news items below for relevant, \
+            timely information. Identify a) the broad market/sector trend these \
+            items collectively suggest, and b) the specific US stock symbols \
+            that are most directly affected. Return ONLY ticker symbols (not \
+            company names) for liquid US equities."
             for item in newsItems do
                 ""
                 $"Title: {item.Title}"
