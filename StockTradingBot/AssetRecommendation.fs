@@ -150,8 +150,10 @@ module AssetRecommendation =
                 let candNewses =
                     candidates
                         |> Seq.map (fun cand ->
-                            CandidateNews.create
-                                cand itemMap[cand.Asset])
+                            itemMap
+                                |> Map.tryFind cand.Asset
+                                |> Option.defaultValue Array.empty
+                                |> CandidateNews.create cand)
                         |> Seq.toArray
                 return candNewses, Array.empty
             with exn ->
