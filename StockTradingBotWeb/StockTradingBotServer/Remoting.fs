@@ -71,9 +71,10 @@ module Api =
         let agent = Agent.create config settings.Model
 
         /// Broker for buying/selling assets.
-        let broker = settings.CreateBroker config
+        let alpacaApi = Alpaca.getApi config
+        let broker = settings.CreateBroker alpacaApi
 
-        RunContext.create httpClient agent broker
+        RunContext.create httpClient agent alpacaApi broker
 
     /// Stock trading bot API.
     let stockTradingBotApi dir =

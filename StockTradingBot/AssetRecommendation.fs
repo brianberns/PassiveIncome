@@ -1,11 +1,5 @@
 namespace StockTradingBot
 
-/// Actions we can take on an asset.
-type AssetAction =
-    | Buy = 0   // must be a .NET enum for serialization
-    | Sell = 1
-    | Hold = 2
-
 /// News items about a specific candidate asset.
 type CandidateNews =
     {
@@ -24,6 +18,12 @@ module CandidateNews =
             Candidate = candidate
             NewsItems = newsItems
         }
+
+/// Actions we can take on an asset.
+type AssetAction =
+    | Buy = 0   // must be a .NET enum for serialization
+    | Sell = 1
+    | Hold = 2
 
 /// Recommended action for an asset.
 type AssetRecommendation =
@@ -74,32 +74,8 @@ module AssetRecommendation =
                 NewsItemFilter.isRecent utcNow
             ]
 
-    /// Creates a prompt for the given candidate assets.
-    let private getPrompt utcNow marketTrend candidateNewses =
-        String.concat "\n" [
-            "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
-            each stock symbol listed below based on its rationale, its detailed \
-            news items, and the overall market trend."
-            ""
-            $"Trend: %s{marketTrend}"
-            for candNews in candidateNewses do
-                ""
-                "###################"
-                ""
-                $"Asset: {candNews.Candidate.Asset.Symbol}"
-                $"Rationale: {candNews.Candidate.Reason}"
-                for item in candNews.NewsItems do
-                    ""
-                    $"Title: {item.Title}"
-                    $"Summary: {item.Summary}"
-                    let hours =
-                        let age = utcNow - item.PublishDate.UtcDateTime
-                        Math.Round(age.TotalHours, 1)
-                    $"Publication age: %.1f{hours} hours"
-        ]
-
-    /// Gets news items for the given candidate asset.
-    let private getCandidateNewsItems
+    /// Gets news feed items for the given candidate asset.
+    let private getCandidateNewsFeedItems
         httpClient utcNow (candidate : Candidate) =
         async {
             let! result =
@@ -108,13 +84,13 @@ module AssetRecommendation =
             return candidate, result
         }
 
-    /// Gets news items for the given candidate assets.
-    let private getNewsItems httpClient utcNow candidates =
+    /// Gets news feed items for the given candidate assets.
+    let private getNewsFeedItems httpClient utcNow candidates =
         async {
             let! results =
                 candidates
                     |> Seq.map (
-                        getCandidateNewsItems httpClient utcNow)
+                        getCandidateNewsFeedItems httpClient utcNow)
                     |> Async.Parallel
 
                 // handle errors
@@ -129,6 +105,114 @@ module AssetRecommendation =
                         | Error error ->
                             Choice2Of2 (cand, error))
         }
+
+    open Alpaca.Markets
+
+    let private getAlpacaNewsItems alpacaApi utcNow (candidates : seq<Candidate>) =
+        task {
+            try
+                let request =
+                    let symbols =
+                        candidates |> Seq.map _.Asset.Symbol
+                    let interval =
+                        let from =
+                            (utcNow : DateTime) - TimeSpan.FromDays(1)
+                        Interval<DateTime>(from, utcNow)
+                    NewsArticlesRequest(
+                        symbols = symbols,
+                        ExcludeItemsWithoutContent = true,
+                        SendFullContentForItems = true,
+                        SortDirection = SortDirection.Descending,
+                        TimeInterval = interval)
+                let! page =
+                    alpacaApi.DataClient.ListNewsArticlesAsync(request)
+                let itemMap =
+                    page.Items
+                        |> Seq.collect (fun article ->
+                            let newsItem =
+                                NewsItem.create
+                                    (string article.Id)
+                                    (DateTimeOffset article.CreatedAtUtc)
+                                    article.Headline
+                                    article.Content
+                            article.Symbols
+                                |> Seq.map (fun symbol ->
+                                    Asset.create symbol,
+                                    newsItem)
+                                |> Seq.groupBy fst
+                                |> Seq.map (fun (asset, group) ->
+                                    let items =
+                                        group
+                                            |> Seq.map snd
+                                            |> Seq.toArray
+                                    asset, items))
+                        |> Map
+                let candNewses =
+                    candidates
+                        |> Seq.map (fun cand ->
+                            CandidateNews.create
+                                cand itemMap[cand.Asset])
+                        |> Seq.toArray
+                return candNewses, Array.empty
+            with exn ->
+                let error =
+                    NewsFeedError.create "Alpaca" exn.Message
+                let candErrors =
+                    candidates
+                        |> Seq.map (fun cand ->
+                            cand, error)
+                        |> Seq.toArray
+                return Array.empty, candErrors
+        } |> Async.AwaitTask
+
+    let getAllNewsItems context utcNow candidates =
+        async {
+            let! newsFeedItems, newsFeedErrors =
+                getNewsFeedItems context.HttpClient utcNow candidates
+            let! alpacaNewsItems, alpacaNewsErrors =
+                getAlpacaNewsItems context.AlpacaApi utcNow candidates
+            let allNewsItems =
+                [|
+                    yield! newsFeedItems
+                    yield! alpacaNewsItems
+                |]
+            let allNewsErrors =
+                [|
+                    yield! newsFeedErrors
+                    yield! alpacaNewsErrors
+                |]
+            return allNewsItems, allNewsErrors
+        }
+
+    /// Creates a prompt for the given candidate assets.
+    let private getPrompt utcNow marketTrend candidateNewses =
+        let prompt =
+            String.concat "\n" [
+                "As a savvy stock trader, decide whether to Buy, Sell, or Hold \
+                each stock symbol listed below based on its rationale, its detailed \
+                news items, and the overall market trend."
+                ""
+                $"Trend: %s{marketTrend}"
+                for candNews in candidateNewses do
+                    ""
+                    "###################"
+                    ""
+                    $"Asset: {candNews.Candidate.Asset.Symbol}"
+                    $"Rationale: {candNews.Candidate.Reason}"
+                    for item in candNews.NewsItems do
+                        ""
+                        $"Title: {item.Title}"
+                        $"Summary: {item.Summary}"
+                        let hours =
+                            let age = utcNow - item.PublishDate.UtcDateTime
+                            Math.Round(age.TotalHours, 1)
+                        $"Publication age: %.1f{hours} hours"
+            ]
+        printfn ""
+        printfn "******************************"
+        printfn ""
+        printfn $"{prompt}"
+        prompt
 
     /// Determines recommendations for the given candidates.
     let getRecommendations agent utcNow marketTrend candNewses =
@@ -168,12 +252,12 @@ module AssetRecommendation =
     /// overview:
     ///    1. Fetches news items specific to the candidate assets.
     ///    2. Asks agent to recommend an action for each asset.
-    let getAsync httpClient agent marketTrend candidates =
+    let getAsync context marketTrend candidates =
         async {
                 // get news items
             let utcNow = DateTime.UtcNow
             let! candNewses, candErrors =
-                getNewsItems httpClient utcNow candidates
+                getAllNewsItems context utcNow candidates
 
                 // news feed errors for some assets don't prevent success for other assets
             let feedErrorResults =
@@ -185,7 +269,7 @@ module AssetRecommendation =
                 // get recommendations
             let! recosResult =
                 getRecommendations
-                    agent utcNow marketTrend candNewses
+                    context.Agent utcNow marketTrend candNewses
             match recosResult with
                 | Ok recos ->
                     let successResults =

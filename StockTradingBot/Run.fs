@@ -102,29 +102,6 @@ open FSharp.Control
  *    5. Place trades based on those recommendations.
  *)
 
-/// Context need to run.
-type RunContext =
-    {
-        /// HTTP client for fetching news feeds.
-        HttpClient : HttpClient
-
-        /// Decision-making agent.
-        Agent : Agent
-
-        /// Broker for buying/selling assets.
-        Broker : Broker
-    }
-
-module RunContext =
-
-    /// Creates a run context.
-    let create httpClient agent broker =
-        {
-            HttpClient = httpClient
-            Agent = agent
-            Broker = broker
-        }
-
 module Run =
 
     /// Gets trade recommendations based on the given market
@@ -142,8 +119,7 @@ module Run =
             ] |> Seq.distinctBy _.Asset      // elminate redundant candidates
 
         AssetRecommendation.getAsync
-            context.HttpClient
-            context.Agent
+            context
             marketOverview.Trend
             candidates
 

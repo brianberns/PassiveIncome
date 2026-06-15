@@ -7,13 +7,25 @@ open Microsoft.Extensions.Configuration
 
 open Alpaca.Markets
 
+/// Alpaca API.
+type AlpacaApi =
+    {
+        DataClient : IAlpacaDataClient
+        TradingClient : IAlpacaTradingClient
+    }
+
 module Alpaca =
 
-    /// Alpaca API.
-    type private Api =
+    /// Gets an Alapca API.
+    let getApi (config : IConfiguration) =
+        let key =
+            let keyId = config["Alpaca:KeyId"]
+            let secret = config["Alpaca:Secret"]
+            SecretKey(keyId, secret)
+        let env = Environments.Paper
         {
-            DataClient : IAlpacaDataClient
-            TradingClient : IAlpacaTradingClient
+            DataClient = env.GetAlpacaDataClient(key)
+            TradingClient = env.GetAlpacaTradingClient(key)
         }
 
     /// Gets the current portfolio.
@@ -139,17 +151,7 @@ module Alpaca =
         }
 
     /// Creates a broker.
-    let createBroker (config : IConfiguration) =
-        let key =
-            let keyId = config["Alpaca:KeyId"]
-            let secret = config["Alpaca:Secret"]
-            SecretKey(keyId, secret)
-        let env = Environments.Paper
-        let api =
-            {
-                DataClient = env.GetAlpacaDataClient(key)
-                TradingClient = env.GetAlpacaTradingClient(key)
-            }
+    let createBroker api =
         {
             GetPortfolio = fun () -> getPortfolio api
             IsMarketOpen = fun () -> isMarketOpen api
@@ -160,8 +162,8 @@ module Alpaca =
 module AlpacaDummy =
 
     /// Creates a broker that is always open.
-    let createBroker config =
-        let impl = Alpaca.createBroker config
+    let createBroker api =
+        let impl = Alpaca.createBroker api
         {
             GetPortfolio =
                 impl.GetPortfolio
