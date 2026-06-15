@@ -14,8 +14,8 @@
     <Compile Include="Broker.fs" />
     <Compile Include="Alpaca.fs" />
     <Compile Include="Agent.fs" />
-    <Compile Include="MarketOverview.fs" />
-    <Compile Include="AssetRecommendation.fs" />
+    <Compile Include="MarketAssessment.fs" />
+    <Compile Include="Order.fs" />
     <Compile Include="Run.fs" />
   </ItemGroup>
 

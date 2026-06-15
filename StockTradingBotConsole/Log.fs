@@ -18,43 +18,23 @@ module Log =
             | Error message ->
                 printfn $"   Error: %s{message}"
 
-    /// Logs a market overview.
-    let private logMarketOverview result =
+    /// Logs a market assessment.
+    let private logMarketAssessment result =
         printfn ""
-        printfn "Market overview:"
+        printfn "Market assessment:"
         match result with
-            | MarketOverviewResult.Success (newsItems, overview) ->
-                printfn $"Trend: {overview.Trend}"
-                let candidates =
-                    overview.Candidates
+            | MarketAssessmentResult.Success (newsItems, overview) ->
+                printfn $"State: {overview.State}"
+                let assets =
+                    overview.AssetAssessments
                         |> Seq.map _.Asset.Symbol
                         |> String.concat ", "
-                printfn $"Candidates: {candidates}"
+                printfn $"Assets: {assets}"
                 printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
                     printfn $"News feed error: {error.FeedName}: {error.Message}"
-            | MarketOverviewResult.AgentError message ->
-                printfn $"Agent error: {message}"
-
-    /// Logs asset recommendations.
-    let private logAssetRecommendations result =
-        printfn ""
-        printfn "Recommendations:"
-        match result with
-            | AssetRecommendationResult.Success results ->
-                for result in results do
-                    match result with
-                        | Ok (newsItems, reco) ->
-                            printfn ""
-                            printfn $"{reco.Asset.Symbol}: {reco.Action}"
-                            printfn $"{reco.Reason}"
-                            printfn $"News items: {newsItems.Length}"
-                        | Error (asset : Asset, message) ->
-                            printfn ""
-                            printfn $"Asset error: {asset}: {message}"
-            | AssetRecommendationResult.AgentError message ->
-                printfn ""
+            | MarketAssessmentResult.AgentError message ->
                 printfn $"Agent error: {message}"
 
     /// Logs asset orders.
@@ -99,16 +79,12 @@ module Log =
                 logPortfolio
                 runResult.PortfolioResultOpt
             Option.iter
-                logMarketOverview
-                runResult.MarketOverviewResultOpt
-            Option.iter
-                logAssetRecommendations
-                runResult.RecommendationResultOpt
+                logMarketAssessment
+                runResult.MarketAssessmentResultOpt
             logAssetOrders
                 runResult.SellResults runResult.BuyResults
         else
-            assert(runResult.MarketOverviewResultOpt.IsNone)
-            assert(runResult.RecommendationResultOpt.IsNone)
+            assert(runResult.MarketAssessmentResultOpt.IsNone)
             assert(runResult.SellResults.Length = 0)
             assert(runResult.BuyResults.Length = 0)
             printfn "Market is closed"

@@ -142,11 +142,11 @@ module View =
                     errorRow $"Error: %s{message}"
         ]
 
-    /// Renders a market overview.
-    let private renderMarketOverview result =
-        section "Market overview" [
+    /// Renders a market assessment.
+    let private renderMarketAssessment result =
+        section "Market assessment" [
             match result with
-                | MarketOverviewResult.Success (newsItems, overview) ->
+                | MarketAssessmentResult.Success (newsItems, assessment) ->
                     Html.div [
                         prop.className "trend"
                         prop.children [
@@ -154,24 +154,24 @@ module View =
                                 prop.className "trend-label"
                                 prop.text "Trend: "
                             ]
-                            Html.span overview.Trend
+                            Html.span assessment.State
                         ]
                     ]
                     Html.div [
-                        prop.className "candidates"
+                        prop.className "asset-assessments"
                         prop.children [
                             Html.span [
-                                prop.className "candidates-label"
+                                prop.className "asset-assessments-label"
                                 prop.text "Candidates: "
                             ]
-                            let candidates =
-                                overview.Candidates
+                            let assetAssessments =
+                                assessment.AssetAssessments
                                     |> Seq.sortBy _.Asset.Symbol
-                            for candidate in candidates do
+                            for assessment in assetAssessments do
                                 Html.span [
                                     prop.className "chip"
-                                    prop.title candidate.Reason
-                                    prop.text candidate.Asset.Symbol
+                                    prop.title assessment.Explanation
+                                    prop.text assessment.Asset.Symbol
                                 ]
                         ]
                     ]
@@ -179,60 +179,16 @@ module View =
                 | FeedErrors errors ->
                     for error in errors do
                         errorRow $"News feed error: {error.FeedName}: {error.Message}"
-                | MarketOverviewResult.AgentError message ->
+                | MarketAssessmentResult.AgentError message ->
                     errorRow $"Agent error: {message}"
         ]
 
-    /// Label and CSS class for an asset action.
-    let private actionInfo (action : AssetAction) =
-        match action with
-            | AssetAction.Buy -> "Buy", "action-buy"
-            | AssetAction.Sell -> "Sell", "action-sell"
-            | AssetAction.Hold -> "Hold", "action-hold"
-            | _ -> string action, "action-hold"
-
-    /// Renders asset recommendations.
-    let private renderRecommendations result =
-        section "Recommendations" [
-            match result with
-                | AssetRecommendationResult.Success results ->
-                    let results =
-                        results
-                            |> Seq.sortBy (function
-                                | Ok (_, reco) -> reco.Asset.Symbol
-                                | Error (asset, _) -> asset.Symbol)
-                    for result in results do
-                        match result with
-                            | Ok (newsItems, reco) ->
-                                let label, actionClass = actionInfo reco.Action
-                                Html.div [
-                                    prop.className "reco"
-                                    prop.children [
-                                        Html.div [
-                                            prop.className "reco-head"
-                                            prop.children [
-                                                Html.span [
-                                                    prop.className "symbol"
-                                                    prop.text reco.Asset.Symbol
-                                                ]
-                                                Html.span [
-                                                    prop.className $"badge {actionClass}"
-                                                    prop.text label
-                                                ]
-                                            ]
-                                        ]
-                                        Html.div [
-                                            prop.className "reco-reason"
-                                            prop.text reco.Reason
-                                        ]
-                                        renderNews newsItems
-                                    ]
-                                ]
-                            | Error (asset : Asset, message : string) ->
-                                errorRow $"Asset error: {asset}: {message}"
-                | AssetRecommendationResult.AgentError message ->
-                    errorRow $"Agent error: {message}"
-        ]
+    /// Label and CSS class for an asset trend.
+    let private actionInfo (trend : Trend) =
+        match trend with
+            | Trend.Positive -> "Buy", "action-buy"
+            | Trend.Negative -> "Sell", "action-sell"
+            | _ -> failwith "Unexpected"
 
     /// Renders a single order result.
     let private renderOrder verb (orderResult : OrderResult) =
@@ -308,11 +264,8 @@ module View =
                     match runResult.PortfolioResultOpt with
                         | Some portfolioResult -> renderPortfolio portfolioResult
                         | None -> Html.none
-                    match runResult.MarketOverviewResultOpt with
-                        | Some overviewResult -> renderMarketOverview overviewResult
-                        | None -> Html.none
-                    match runResult.RecommendationResultOpt with
-                        | Some recoResult -> renderRecommendations recoResult
+                    match runResult.MarketAssessmentResultOpt with
+                        | Some assessmentResult -> renderMarketAssessment assessmentResult
                         | None -> Html.none
                     renderOrders runResult.SellResults runResult.BuyResults
                 else

@@ -160,14 +160,14 @@ body {
     color: var(--text);
 }
 
-.candidates {
+.asset-assessments {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
 }
 
-.candidates-label {
+.asset-assessments-label {
     font-weight: 600;
     color: var(--text);
 }

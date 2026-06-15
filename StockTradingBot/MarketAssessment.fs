@@ -1,40 +1,38 @@
 namespace StockTradingBot
 
-/// Asset that we might be interested in.
-[<NoComparison>]
-type Candidate =
+/// Asset trend.
+type Trend =
+    | Positive = 0   // must be a .NET enum for serialization
+    | Negative = 1
+
+/// Asset assessment.
+type AssetAssessment =
     {
-        /// Candidate asset.
+        /// Asset in question.
         Asset : Asset
 
-        /// Reason for interest.
-        Reason : string
+        /// Likely asset trend.
+        Trend : Trend
+
+        /// Explanation behind this assessment.
+        Explanation : string
     }
 
-module Candidate =
-
-    /// Creates a candidate.
-    let create asset reason =
-        {
-            Asset = asset
-            Reason = reason
-        }
-
-/// Overview of the market.
-type MarketOverview =
+/// Assessment of the market.
+type MarketAssessment =
     {
-        /// Overall market trend.
-        Trend : string
+        /// Overall market state.
+        State : string
 
-        /// Candidate assets for trading.
-        Candidates : Candidate[]
+        /// Asset assessments.
+        AssetAssessments : AssetAssessment[]
     }
 
-/// Results possible when determining market overview.
-type MarketOverviewResult =
+/// Results possible when assessing the market.
+type MarketAssessmentResult =
 
     /// Agent succeeded.
-    | Success of NewsItem[] * MarketOverview
+    | Success of NewsItem[] * MarketAssessment
 
     /// News feed errors occurred prior to agent request.
     | FeedErrors of NewsFeedError[]
@@ -42,13 +40,13 @@ type MarketOverviewResult =
     /// Agent request failed.
     | AgentError of string (*error message*)
 
-module MarketOverview =
+module MarketAssessment =
 
-    /// Creates a market overview.
-    let create trend candidates =
+    /// Creates a market assessment.
+    let create state assessments =
         {
-            Trend = trend
-            Candidates = candidates
+            State = state
+            AssetAssessments = assessments
         }
 
 #if !FABLE_COMPILER
@@ -99,11 +97,13 @@ module MarketOverview =
     /// Creates a prompt for the given news items.
     let private getPrompt utcNow newsItems =
         String.concat "\n" [
-            "As a savvy stock trader, scan the items below for relevant, \
-            timely news. Identify a) the broad market/sector trend suggested \
-            by the news, and b) the specific US companies that are directly \
-            affected by the news. Return ONLY ticker symbols (not company \
-            names) for liquid US equities."
+            "As a savvy stock trader, scan the news items below for \
+            robust trends that are likely to persist over a period of \
+            hours or days. Assess the overall state of the market and \
+            then identify the specific US companies that are likely to \
+            trend positive or negative in the market and explain why. \
+            Return ONLY ticker symbols (not company names) for liquid \
+            US equities."
             for item in newsItems do
                 ""
                 $"Title: {item.Title}"
@@ -130,8 +130,8 @@ module MarketOverview =
                     | Error error -> Choice2Of2 error)
         }
 
-    /// Determines market overview from the given news items.
-    let private getOverview agent utcNow (itemArrays : NewsItem[][]) =
+    /// Assesses market from the given news items.
+    let private getAssessment agent utcNow (itemArrays : NewsItem[][]) =
         async {
                 // gather news items
             let items =
@@ -144,20 +144,20 @@ module MarketOverview =
                 // query agent
             let! result =
                 let prompt = getPrompt utcNow items
-                Agent.getResultAsync<MarketOverview> prompt agent
+                Agent.getResultAsync<MarketAssessment> prompt agent
 
                 // process result
             match result with
-                | Ok overview ->
-                    return Success (items, overview)
+                | Ok assessment ->
+                    return Success (items, assessment)
                 | Error message ->
                     return AgentError message
         }
 
-    /// Determines the current market overview:
+    /// Assesses the market:
     ///    1. Fetches general news items from feeds.
     ///    2. Asks agent to identify overall market trend and
-    ///       candidate assets from those news items.
+    ///       specific assets from those news items.
     let getAsync httpClient agent =
         async {
                 // get news items
@@ -165,11 +165,11 @@ module MarketOverview =
             let! itemArrays, errors =
                 getNewsItems httpClient (getFeeds utcNow)
 
-                // get overview?
+                // get assessment?
             if errors.Length > 0 then   // to-do: carry on (with limited information) if any of the feeds fail?
                 return FeedErrors errors
             else
-                return! getOverview agent utcNow itemArrays
+                return! getAssessment agent utcNow itemArrays
         }
 
 #endif
