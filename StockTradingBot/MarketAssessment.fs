@@ -14,8 +14,8 @@ type AssetAssessment =
         /// Likely asset trend.
         Trend : Trend
 
-        /// Explanation behind this assessment.
-        Explanation : string
+        /// Reason behind this assessment.
+        Reason : string
     }
 
 /// Assessment of the market.
@@ -130,6 +130,20 @@ module MarketAssessment =
                     | Error error -> Choice2Of2 error)
         }
 
+    /// Tries to find an error in the given assessment.
+    let tryFindError assessment =
+
+            // check for duplicate asset assessments
+        let nTotal =
+            assessment.AssetAssessments.Length
+        let nDistinct =
+            assessment.AssetAssessments
+                |> Array.distinctBy _.Asset
+                |> Array.length
+        assert(nDistinct <= nTotal)
+        if nDistinct < nTotal then Some "Duplicate asset assessments"
+        else None
+
     /// Assesses market from the given news items.
     let private getAssessment agent utcNow (itemArrays : NewsItem[][]) =
         async {
@@ -149,7 +163,11 @@ module MarketAssessment =
                 // process result
             match result with
                 | Ok assessment ->
-                    return Success (items, assessment)
+                    match tryFindError assessment with
+                        | Some message ->
+                            return AgentError message
+                        | None ->
+                            return Success (items, assessment)
                 | Error message ->
                     return AgentError message
         }

@@ -164,14 +164,14 @@ module View =
                                 prop.className "asset-assessments-label"
                                 prop.text "Candidates: "
                             ]
-                            let assetAssessments =
+                            let aas =
                                 assessment.AssetAssessments
                                     |> Seq.sortBy _.Asset.Symbol
-                            for assessment in assetAssessments do
+                            for aa in aas do
                                 Html.span [
                                     prop.className "chip"
-                                    prop.title assessment.Explanation
-                                    prop.text assessment.Asset.Symbol
+                                    prop.title aa.Reason
+                                    prop.text aa.Asset.Symbol
                                 ]
                         ]
                     ]
@@ -184,7 +184,7 @@ module View =
         ]
 
     /// Label and CSS class for an asset trend.
-    let private actionInfo (trend : Trend) =
+    let private trendInfo (trend : Trend) =
         match trend with
             | Trend.Positive -> "Buy", "action-buy"
             | Trend.Negative -> "Sell", "action-sell"

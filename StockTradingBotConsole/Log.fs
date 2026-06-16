@@ -20,16 +20,10 @@ module Log =
 
     /// Logs a market assessment.
     let private logMarketAssessment result =
-        printfn ""
-        printfn "Market assessment:"
         match result with
-            | MarketAssessmentResult.Success (newsItems, overview) ->
-                printfn $"State: {overview.State}"
-                let assets =
-                    overview.AssetAssessments
-                        |> Seq.map _.Asset.Symbol
-                        |> String.concat ", "
-                printfn $"Assets: {assets}"
+            | MarketAssessmentResult.Success (newsItems, assessment) ->
+                printfn ""
+                printfn $"Market assessment: {assessment.State}"
                 printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
@@ -45,21 +39,23 @@ module Log =
             Array.length sellResults + Array.length buyResults
         if count > 0 then
             for (sellResult : OrderResult) in sellResults do
+                printfn $"{sellResult.Asset}:"
+                printfn $"{sellResult.Reason}"
                 match sellResult.Result with
                     | Ok detail ->
-                        printfn $"   Sold %.3f{detail.FilledQuantity} shares of \
-                            {sellResult.Asset} @ {detail.AverageFillPrice}: \
+                        printfn $"   Sold %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error message ->
-                        printfn $"   Sell error: {sellResult.Asset}: {message}"
+                        printfn $"   Sell error: {message}"
             for (buyResult : OrderResult) in buyResults do
+                printfn $"{buyResult.Asset}:"
+                printfn $"{buyResult.Reason}"
                 match buyResult.Result with
                     | Ok detail ->
-                        printfn $"   Bought %.3f{detail.FilledQuantity} shares of \
-                            {buyResult.Asset} @ {detail.AverageFillPrice}: \
+                        printfn $"   Bought %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error message ->
-                        printfn $"   Buy error: {buyResult.Asset}: {message}"
+                        printfn $"   Buy error: {message}"
         else
             printfn "   None"
 
