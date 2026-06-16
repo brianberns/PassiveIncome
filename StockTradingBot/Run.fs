@@ -101,7 +101,7 @@ module Run =
                     context.Agent
 
             match assessmentResult with
-                | MarketAssessmentResult.Success (_, assessment) ->
+                | MarketAssessmentResult.Success assessment ->
 
                         // place orders based on assessment
                     let! sellResults, buyResults =

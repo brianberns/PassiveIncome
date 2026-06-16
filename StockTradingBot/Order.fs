@@ -9,6 +9,9 @@ type OrderResult =
         /// Reason for trade.
         Reason : string
 
+        /// News item IDs supporting this trade.
+        NewsItemIds : string[]
+
         /// Result of trade.
         Result : Result<FilledOrderDetail, string (*message*)>
     }
@@ -16,10 +19,11 @@ type OrderResult =
 module OrderResult =
 
     /// Creates an order result.
-    let create asset reason result =
+    let create asset reason newsItemIds result =
         {
             Asset = asset
             Reason = reason
+            NewsItemIds = newsItemIds
             Result = result
         }
 
@@ -32,11 +36,12 @@ module Order =
     /// Sells the given asset quantities.
     let private sellAssetQuantities broker assetTuples =
         assetTuples
-            |> Seq.map (fun (asset, quantity, reason) ->
+            |> Seq.map (fun (asset, quantity, reason, newsItemIds) ->
                 async {
                     let! result =
                         broker.Sell asset quantity
-                    return OrderResult.create asset reason result
+                    return OrderResult.create
+                        asset reason newsItemIds result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -57,11 +62,12 @@ module Order =
     let private buyAssets broker (assetTuples : _[]) (cash : Money) =
         let portion = cash / decimal assetTuples.Length   // amount to spend on each asset
         assetTuples
-            |> Seq.map (fun (asset, reason) ->
+            |> Seq.map (fun (asset, reason, newsItemIds) ->
                 async {
                     let! result =
                         broker.Buy asset portion
-                    return OrderResult.create asset reason result
+                    return OrderResult.create
+                        asset reason newsItemIds result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -80,7 +86,8 @@ module Order =
                             let map =
                                 group
                                     |> Array.map (fun aa ->
-                                        aa.Asset, aa.Reason)
+                                        aa.Asset,
+                                        (aa.Reason, aa.NewsItemIds))
                                     |> Map
                             assert(map.Count = group.Length)
                             trend, map)
@@ -99,15 +106,15 @@ module Order =
                         match Map.tryFind asset sellMap with
 
                                 // sell, explicit reason
-                            | Some reason ->
-                                asset, value.Quantity, reason
+                            | Some (reason, newsItemIds) ->
+                                asset, value.Quantity, reason, newsItemIds
 
                                 // hold, buying more of this asset
                             | None when buyMap.ContainsKey(asset) -> ()
 
                                 // sell, to generate cash
                             | None when buyMap.Count > 0 ->
-                                asset, value.Quantity, "Making room in portfolio."
+                                asset, value.Quantity, "Cash generation.", [||]
 
                                 // hold, no reason to sell
                             | None -> ()
@@ -120,7 +127,11 @@ module Order =
                 // buy assets with cash on hand
             if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
                 let! buyResults =
-                    let buyTuples = Map.toArray buyMap
+                    let buyTuples =
+                        [|
+                            for (KeyValue(asset, (reason, newsItemIds))) in buyMap do
+                                asset, reason, newsItemIds
+                        |]
                     buyAssets broker buyTuples cash
                 return sellResults, buyResults
             else

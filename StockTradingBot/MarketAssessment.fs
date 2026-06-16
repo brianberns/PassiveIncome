@@ -14,8 +14,11 @@ type AssetAssessment =
         /// Likely asset trend.
         Trend : Trend
 
-        /// Reason behind this assessment.
+        /// Reason supporting this assessment.
         Reason : string
+
+        /// News item IDs supporting this assessment.
+        NewsItemIds : string[]
     }
 
 /// Assessment of the market.
@@ -32,7 +35,7 @@ type MarketAssessment =
 type MarketAssessmentResult =
 
     /// Agent succeeded.
-    | Success of NewsItem[] * MarketAssessment
+    | Success of MarketAssessment
 
     /// News feed errors occurred prior to agent request.
     | FeedErrors of NewsFeedError[]
@@ -101,9 +104,10 @@ module MarketAssessment =
             robust trends that are likely to persist over a period of \
             hours or days. Assess the overall state of the market and \
             then identify the specific US companies that are likely to \
-            trend positive or negative in the market and explain why. \
-            Return ONLY ticker symbols (not company names) for liquid \
-            US equities."
+            trend positive or negative in the market, explain why, and \
+            refer to the specific IDs of news items that support your \
+            assessment. Return ONLY ticker symbols (not company names) \
+            for liquid US equities."
             for item in newsItems do
                 ""
                 $"Title: {item.Title}"
@@ -111,6 +115,7 @@ module MarketAssessment =
                 let hours =
                     let age = utcNow - item.PublishDate.UtcDateTime
                     Math.Round(age.TotalHours, 1)
+                $"ID: {item.Id}"
                 $"Publication age: %.1f{hours} hours"
         ]
 
@@ -167,7 +172,7 @@ module MarketAssessment =
                         | Some message ->
                             return AgentError message
                         | None ->
-                            return Success (items, assessment)
+                            return Success assessment
                 | Error message ->
                     return AgentError message
         }

@@ -21,11 +21,9 @@ module Log =
     /// Logs a market assessment.
     let private logMarketAssessment result =
         match result with
-            | MarketAssessmentResult.Success (newsItems, assessment) ->
+            | MarketAssessmentResult.Success assessment ->
                 printfn ""
                 printfn $"{assessment.State}"
-                printfn ""
-                printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
                     printfn $"News feed error: {error.FeedName}: {error.Message}"
@@ -41,6 +39,10 @@ module Log =
                 printfn ""
                 printfn $"{sellResult.Asset}:"
                 printfn $"{sellResult.Reason}"
+                if sellResult.NewsItemIds.Length > 0 then
+                    let newsItemIds =
+                        String.concat ", " sellResult.NewsItemIds
+                    printfn $"News item IDs: {newsItemIds}"
                 match sellResult.Result with
                     | Ok detail ->
                         printfn $"Sold %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
@@ -51,6 +53,10 @@ module Log =
                 printfn ""
                 printfn $"{buyResult.Asset}:"
                 printfn $"{buyResult.Reason}"
+                if buyResult.NewsItemIds.Length > 0 then
+                    let newsItemIds =
+                        String.concat ", " buyResult.NewsItemIds
+                    printfn $"News item IDs: {newsItemIds}"
                 match buyResult.Result with
                     | Ok detail ->
                         printfn $"Bought %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \

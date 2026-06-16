@@ -146,12 +146,12 @@ module View =
     let private renderMarketAssessment result =
         section "Market assessment" [
             match result with
-                | MarketAssessmentResult.Success (newsItems, assessment) ->
+                | MarketAssessmentResult.Success assessment ->
                     Html.div [
                         prop.className "state"
                         prop.text assessment.State
                     ]
-                    renderNews newsItems
+                    // renderNews newsItems
                 | FeedErrors errors ->
                     for error in errors do
                         errorRow $"News feed error: {error.FeedName}: {error.Message}"
