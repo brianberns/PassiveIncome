@@ -2,6 +2,7 @@
 
 open System
 open System.Net.Http
+open System.Collections.Generic
 
 open Microsoft.Extensions.Configuration
 
@@ -12,14 +13,18 @@ open Fable.Remoting.Suave
 
 module Api =
 
-    let runResults = ResizeArray<RunResult>()
+    let private capacity = 10
+
+    let private runResults = Queue<RunResult>(capacity)
 
     let runLoop context =
         let delay = TimeSpan.FromHours(1)
         async {
             for result in Run.runLoop context delay do
                 lock runResults (fun () ->
-                    runResults.Add(result))
+                    while runResults.Count >= capacity do
+                        runResults.Dequeue() |> ignore
+                    runResults.Enqueue(result))
         }
 
     let runLoopDummy (context : RunContext) =
@@ -33,7 +38,7 @@ module Api =
                     Array.empty
                     DateTimeOffset.Now
             lock runResults (fun () ->
-                runResults.Add(result))
+                runResults.Enqueue(result))
         }
 
     /// Settings.
@@ -87,7 +92,9 @@ module Api =
                 fun () ->
                     async {
                         return lock runResults (fun () ->
-                            Seq.toArray runResults)
+                            runResults
+                                |> Seq.sortBy _.StartTime   // reverses the queue, since newer resutls are in the back
+                                |> Seq.toArray)
                     }
         }
 
