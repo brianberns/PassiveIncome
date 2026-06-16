@@ -148,32 +148,8 @@ module View =
             match result with
                 | MarketAssessmentResult.Success (newsItems, assessment) ->
                     Html.div [
-                        prop.className "trend"
-                        prop.children [
-                            Html.span [
-                                prop.className "trend-label"
-                                prop.text "Trend: "
-                            ]
-                            Html.span assessment.State
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "asset-assessments"
-                        prop.children [
-                            Html.span [
-                                prop.className "asset-assessments-label"
-                                prop.text "Candidates: "
-                            ]
-                            let aas =
-                                assessment.AssetAssessments
-                                    |> Seq.sortBy _.Asset.Symbol
-                            for aa in aas do
-                                Html.span [
-                                    prop.className "chip"
-                                    prop.title aa.Reason
-                                    prop.text aa.Asset.Symbol
-                                ]
-                        ]
+                        prop.className "state"
+                        prop.text assessment.State
                     ]
                     renderNews newsItems
                 | FeedErrors errors ->
@@ -183,43 +159,51 @@ module View =
                     errorRow $"Agent error: {message}"
         ]
 
-    /// Label and CSS class for an asset trend.
-    let private trendInfo (trend : Trend) =
-        match trend with
-            | Trend.Positive -> "Buy", "action-buy"
-            | Trend.Negative -> "Sell", "action-sell"
-            | _ -> failwith "Unexpected"
-
-    /// Renders a single order result.
-    let private renderOrder verb (orderResult : OrderResult) =
-        match orderResult.Result with
-            | Ok detail ->
+    /// Renders a single order result. The symbol is prefixed with a
+    /// color-coded pill indicating the side (green to buy, red to sell).
+    let private renderOrder verb label badgeClass (orderResult : OrderResult) =
+        Html.div [
+            prop.className "order"
+            prop.children [
                 Html.div [
-                    prop.className "order"
+                    prop.className "order-head"
                     prop.children [
                         Html.span [
-                            prop.className "order-verb"
-                            prop.text (verb : string)
-                        ]
-                        Html.span [
-                            prop.text
-                                $"{formatQty detail.FilledQuantity} shares of "
+                            prop.className $"badge {badgeClass}"
+                            prop.text (label : string)
                         ]
                         Html.span [
                             prop.className "symbol"
                             prop.text (string orderResult.Asset)
                         ]
-                        Html.span [
-                            prop.text $" @ {detail.AverageFillPrice}"
-                        ]
-                        Html.span [
-                            prop.className "num value"
-                            prop.text $"{detail.TotalPrice} total"
-                        ]
                     ]
                 ]
-            | Error message ->
-                errorRow $"{verb} error: {orderResult.Asset}: {message}"
+                Html.div [
+                    prop.className "order-reason"
+                    prop.text orderResult.Reason
+                ]
+                match orderResult.Result with
+                    | Ok detail ->
+                        Html.div [
+                            prop.className "order-line"
+                            prop.children [
+                                Html.span [
+                                    prop.text (verb : string)
+                                ]
+                                Html.span [
+                                    prop.text
+                                        $"{formatQty detail.FilledQuantity} shares @ {detail.AverageFillPrice}:"
+                                ]
+                                Html.span [
+                                    prop.className "num value"
+                                    prop.text $"{detail.TotalPrice} total"
+                                ]
+                            ]
+                        ]
+                    | Error message ->
+                        errorRow $"{verb} error: {message}"
+            ]
+        ]
 
     /// Renders sell and buy orders.
     let private renderOrders sellResults buyResults =
@@ -228,9 +212,9 @@ module View =
                 Array.length sellResults + Array.length buyResults
             if count > 0 then
                 for sellResult in sellResults do
-                    renderOrder "Sold" sellResult
+                    renderOrder "Sold" "Sell" "action-sell" sellResult
                 for buyResult in buyResults do
-                    renderOrder "Bought" buyResult
+                    renderOrder "Bought" "Buy" "action-buy" buyResult
             else
                 Html.div [
                     prop.className "muted"
