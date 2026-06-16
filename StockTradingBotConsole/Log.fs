@@ -23,7 +23,8 @@ module Log =
         match result with
             | MarketAssessmentResult.Success (newsItems, assessment) ->
                 printfn ""
-                printfn $"Market assessment: {assessment.State}"
+                printfn $"{assessment.State}"
+                printfn ""
                 printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
@@ -33,31 +34,31 @@ module Log =
 
     /// Logs asset orders.
     let private logAssetOrders sellResults buyResults =
-        printfn ""
-        printfn "Orders:"
         let count =
             Array.length sellResults + Array.length buyResults
         if count > 0 then
             for (sellResult : OrderResult) in sellResults do
+                printfn ""
                 printfn $"{sellResult.Asset}:"
                 printfn $"{sellResult.Reason}"
                 match sellResult.Result with
                     | Ok detail ->
-                        printfn $"   Sold %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
+                        printfn $"Sold %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error message ->
-                        printfn $"   Sell error: {message}"
+                        printfn $"Sell error: {message}"
             for (buyResult : OrderResult) in buyResults do
+                printfn ""
                 printfn $"{buyResult.Asset}:"
                 printfn $"{buyResult.Reason}"
                 match buyResult.Result with
                     | Ok detail ->
-                        printfn $"   Bought %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
+                        printfn $"Bought %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
                             {detail.TotalPrice} total"
                     | Error message ->
-                        printfn $"   Buy error: {message}"
+                        printfn $"Buy error: {message}"
         else
-            printfn "   None"
+            printfn "None"
 
     /// Logs a run.
     let logRun runResult =
