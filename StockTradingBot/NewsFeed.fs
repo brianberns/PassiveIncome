@@ -67,11 +67,11 @@ module NewsItemFilter =
                 && not (String.IsNullOrWhiteSpace(
                     item.Summary.Text))
 
-    /// The given item was published in the last day?
+    /// The given item was published recently?
     let isRecent utcNow : NewsItemFilter =
-        let oneDay = TimeSpan.FromDays(1)
+        let timeSpan = TimeSpan.FromHours(8)
         fun item ->
-            utcNow - item.PublishDate.UtcDateTime < oneDay
+            utcNow - item.PublishDate.UtcDateTime < timeSpan
 
 /// News feed (via RSS, for example).
 type NewsFeed =
