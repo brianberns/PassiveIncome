@@ -15,16 +15,27 @@ module Api =
 
     let private capacity = 10
 
-    let private runResults = Queue<RunResult>(capacity)
+    /// Run results in chronological order (i.e. oldest first).
+    let private runResults = LinkedList<RunResult>()
 
     let runLoop context =
         let delay = TimeSpan.FromHours(1)
         async {
             for result in Run.runLoop context delay do
                 lock runResults (fun () ->
+
+                        // collapse redundant results
+                    if not result.IsMarketOpen
+                        && runResults.Count > 0
+                        && not runResults.Last.Value.IsMarketOpen then
+                        runResults.RemoveLast() |> ignore
+
+                        // remove oldest result?
                     while runResults.Count >= capacity do
-                        runResults.Dequeue() |> ignore
-                    runResults.Enqueue(result))
+                        runResults.RemoveFirst()
+
+                        // add new result
+                    runResults.AddLast(result) |> ignore)
         }
 
     let runLoopDummy (context : RunContext) =
@@ -38,7 +49,7 @@ module Api =
                     Array.empty
                     DateTimeOffset.Now
             lock runResults (fun () ->
-                runResults.Enqueue(result))
+                runResults.AddLast(result) |> ignore)
         }
 
     /// Settings.
@@ -92,9 +103,7 @@ module Api =
                 fun () ->
                     async {
                         return lock runResults (fun () ->
-                            runResults
-                                |> Seq.sortBy _.StartTime   // reverses the queue, since newer resutls are in the back
-                                |> Seq.toArray)
+                            Seq.toArray runResults)
                     }
         }
 
