@@ -24,6 +24,14 @@ type RunResult =
         EndTime : DateTimeOffset
     }
 
+    /// Indicates whether the market is open.
+    member result.IsMarketOpen =
+        assert(result.PortfolioResultOpt.IsSome
+            || (result.MarketAssessmentResultOpt.IsNone
+                && result.SellResults.Length = 0
+                && result.BuyResults.Length = 0))
+        result.PortfolioResultOpt.IsSome   // in lieu of an actual flag, this is good enough
+
 module RunResult =
 
     /// Creates a run result.

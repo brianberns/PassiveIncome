@@ -69,9 +69,7 @@ module Log =
         printfn $"{runResult.StartTime}"
 
             // is market open?
-        let marketIsOpen =
-            runResult.PortfolioResultOpt.IsSome   // to-do: this is a hacky signal
-        if marketIsOpen then
+        if runResult.IsMarketOpen then
             Option.iter
                 logPortfolio
                 runResult.PortfolioResultOpt
@@ -81,9 +79,6 @@ module Log =
             logAssetOrders
                 runResult.SellResults runResult.BuyResults
         else
-            assert(runResult.MarketAssessmentResultOpt.IsNone)
-            assert(runResult.SellResults.Length = 0)
-            assert(runResult.BuyResults.Length = 0)
             printfn "Market is closed"
 
         let duration =

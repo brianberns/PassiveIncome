@@ -242,9 +242,8 @@ module View =
                     ]
                 ]
 
-                    // is the market open? (hacky signal, as in the console)
-                let marketIsOpen = runResult.PortfolioResultOpt.IsSome
-                if marketIsOpen then
+                    // is the market open?
+                if runResult.IsMarketOpen then
                     match runResult.PortfolioResultOpt with
                         | Some portfolioResult -> renderPortfolio portfolioResult
                         | None -> Html.none
