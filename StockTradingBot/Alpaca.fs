@@ -32,14 +32,15 @@ module Alpaca =
                         for position in positions do
                             let asset = Asset.create position.Symbol
                             let value =
-                                let price =
+                                let curPrice =
                                     position.AssetCurrentPrice
                                         |> Option.ofNullable
                                         |> Option.defaultValue
                                             position.AverageEntryPrice   // ick, but hopefully won't happen
                                 AssetValue.create
                                     position.Quantity
-                                    (Usd price)
+                                    (Usd position.AverageEntryPrice)
+                                    (Usd curPrice)
                             asset, value
                     ]
 

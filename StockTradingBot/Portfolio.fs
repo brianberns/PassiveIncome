@@ -24,6 +24,9 @@ type AssetValue =
         /// Amount of asset in the portfolio.
         Quantity : decimal
 
+        /// Average entry price of the asset in the portfolio.
+        AverageEntryPrice : Money
+
         /// Current price of the asset in the portfolio.
         CurrentPrice : Money
     }
@@ -35,9 +38,10 @@ type AssetValue =
 module AssetValue =
 
     /// Creates an asset value.
-    let create quantity currentPrice =
+    let create quantity avgEntryPrice currentPrice =
         {
             Quantity = quantity
+            AverageEntryPrice = avgEntryPrice
             CurrentPrice = currentPrice
         }
 
