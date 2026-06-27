@@ -278,7 +278,8 @@ module View =
                     prop.text refresh
                 ]
                 match state with
-                    | Ok results ->
+                    | Ok None -> ()
+                    | Ok (Some results) ->
                         if Array.isEmpty results then
                             Html.div [
                                 prop.className "muted"

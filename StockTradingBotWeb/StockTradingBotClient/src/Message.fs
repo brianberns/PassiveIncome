@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Elmish
 
-type State = Result<RunResult[], string>
+type State = Result<Option<RunResult[]>, string>
 
 type Message =
 
@@ -21,13 +21,19 @@ module Message =
 
     /// Command that fetches the latest results.
     let private fetchResults =
+        let getResults () =
+            async {
+                match! Remoting.getResults () with
+                    | Ok results -> return Ok (Some results)
+                    | Error error -> return Error error
+            }
         Cmd.OfAsync.perform
-            Remoting.getResults
+            getResults
             ()
             Update
 
     let init () =
-        Ok (Array.empty), fetchResults
+        Ok None, fetchResults
 
     let update msg (state : State) =
         match msg with
