@@ -12,7 +12,7 @@ module Log =
             | Ok portfolio ->
                 for (asset, value) in Map.toSeq portfolio.PositionMap do
                     printfn $"   {asset}: %.3f{value.Quantity} shares @ \
-                        {value.CurrentPrice}/share = {value.Value}"
+                        {value.CurrentPrice}/share = {value.Value} (Net change: {value.NetChange})"
                 printfn $"   Cash: {portfolio.TradableCash}"
                 printfn $"   Total value: {portfolio.TotalValue}"
             | Error message ->

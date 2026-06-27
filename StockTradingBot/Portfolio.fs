@@ -35,6 +35,10 @@ type AssetValue =
     member this.Value =
         this.CurrentPrice * this.Quantity   // Money on the left so Fable dispatches to Money's (*) operator
 
+    /// Net change in the value of this asset.
+    member this.NetChange =
+        (this.CurrentPrice - this.AverageEntryPrice) * this.Quantity
+
 module AssetValue =
 
     /// Creates an asset value.
