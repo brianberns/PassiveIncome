@@ -36,7 +36,7 @@ type Money =
     /// Display string.
     member money.String =
         let (Usd usd) = money
-        let signStr = if usd < 0 then "-" else ""
+        let signStr = if usd < 0m then "-" else ""
         $"{signStr}$%.2f{abs usd}"
 
     /// Display string.
