@@ -1,3 +1,0 @@
-﻿[web_part.stock_trading_bot]
-assembly_path = '..\..\..\..\StockTradingBotServer\bin\Debug\net10.0\StockTradingBotServer.dll'
-web_path = "/StockTradingBot"

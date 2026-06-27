@@ -9,14 +9,14 @@
     <DefineConstants>TRACE;FABLE_COMPILER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\..\StockTradingBot\NewsFeed.fs" />
-    <Compile Include="..\..\..\StockTradingBot\Money.fs" />
-    <Compile Include="..\..\..\StockTradingBot\Portfolio.fs" />
-    <Compile Include="..\..\..\StockTradingBot\Broker.fs" />
-    <Compile Include="..\..\..\StockTradingBot\MarketAssessment.fs" />
-    <Compile Include="..\..\..\StockTradingBot\Order.fs" />
-    <Compile Include="..\..\..\StockTradingBot\Run.fs" />
-    <Compile Include="..\..\StockTradingBotServer\Shared.fs" />
+    <Compile Include="..\..\..\CoreLibrary\NewsFeed.fs" Link="NewsFeed.fs" />
+    <Compile Include="..\..\..\CoreLibrary\Money.fs" Link="Money.fs" />
+    <Compile Include="..\..\..\CoreLibrary\Portfolio.fs" Link="Portfolio.fs" />
+    <Compile Include="..\..\..\CoreLibrary\Broker.fs" Link="Broker.fs" />
+    <Compile Include="..\..\..\CoreLibrary\MarketAssessment.fs" Link="MarketAssessment.fs" />
+    <Compile Include="..\..\..\CoreLibrary\Order.fs" Link="Order.fs" />
+    <Compile Include="..\..\..\CoreLibrary\Run.fs" Link="Run.fs" />
+    <Compile Include="..\..\Server\Shared.fs" Link="Shared.fs" />
     <Compile Include="Remoting.fs" />
     <Compile Include="Message.fs" />
     <Compile Include="View.fs" />
