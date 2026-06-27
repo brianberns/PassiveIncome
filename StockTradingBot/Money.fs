@@ -36,7 +36,8 @@ type Money =
     /// Display string.
     member money.String =
         let (Usd usd) = money
-        $"$%.2f{usd}"
+        let signStr = if usd < 0 then "-" else ""
+        $"{signStr}$%.2f{abs usd}"
 
     /// Display string.
     override money.ToString() =
