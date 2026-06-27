@@ -36,6 +36,20 @@ body {
     margin: 0 0 4px;
 }
 
+.source-link {
+    font-size: 0.85rem;
+    margin: 0 0 4px;
+}
+
+.source-link a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.source-link a:hover {
+    text-decoration: underline;
+}
+
 .refresh-note {
     color: var(--muted);
     font-size: 0.85rem;

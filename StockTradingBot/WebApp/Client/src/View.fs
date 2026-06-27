@@ -284,6 +284,17 @@ module View =
                     prop.text "Stock Trading Bot"
                 ]
                 Html.div [
+                    prop.className "source-link"
+                    prop.children [
+                        Html.a [
+                            prop.href "https://github.com/brianberns/PassiveIncome/tree/main/StockTradingBot"
+                            prop.target "_blank"
+                            prop.rel "noopener noreferrer"
+                            prop.text "View source code"
+                        ]
+                    ]
+                ]
+                Html.div [
                     prop.className "refresh-note"
                     let refresh =
                         let hours = Message.refreshInterval.TotalHours
