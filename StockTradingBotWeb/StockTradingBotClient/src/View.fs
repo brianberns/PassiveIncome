@@ -9,6 +9,13 @@ module View =
     let private formatQty (quantity : decimal) =
         sprintf "%.3f" (float quantity)
 
+    /// Formats a net change in value, with an explicit sign for
+    /// increases (decreases are already signed by Money).
+    let private formatNetChange (netChange : Money) =
+        let (Usd amount) = netChange
+        let sign = if amount > 0m then "+" else ""
+        $"{sign}{netChange}"
+
     /// Formats a timestamp as e.g. "Jun 10, 2026 3:43 PM".
     let private formatTimestamp (time : DateTimeOffset) =
         let date = time.ToString("MMM d, yyyy")
@@ -116,6 +123,15 @@ module View =
                                         Html.td [
                                             prop.className "num value"
                                             prop.text (string value.Value)
+                                        ]
+                                        let (Usd netChange) = value.NetChange
+                                        Html.td [
+                                            prop.classes [
+                                                "num"
+                                                "change"
+                                                if netChange < 0m then "change-down"
+                                            ]
+                                            prop.text (formatNetChange value.NetChange)
                                         ]
                                     ]
                             ]

@@ -139,6 +139,10 @@ body {
             color: var(--text);
         }
 
+        .positions td.change-down {
+            color: var(--red);
+        }
+
 .summary {
     display: flex;
     gap: 24px;
