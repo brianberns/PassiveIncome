@@ -17,7 +17,7 @@ type Message =
 module Message =
 
     /// How often to automatically refresh.
-    let refreshInterval = TimeSpan.FromHours(1.0)
+    let refreshInterval = TimeSpan.FromMinutes(15.0)
 
     /// Command that fetches the latest results.
     let private fetchResults =

@@ -297,11 +297,11 @@ module View =
                 Html.div [
                     prop.className "refresh-note"
                     let refresh =
-                        let hours = Message.refreshInterval.TotalHours
-                        if hours = 1.0 then
-                            "Results refresh automatically every hour."
+                        let mins = Message.refreshInterval.TotalMinutes
+                        if mins = 1.0 then
+                            "Results refresh automatically every minute."
                         else
-                            $"Results refresh automatically every {hours} hours."
+                            $"Results refresh automatically every {mins} minutes."
                     prop.text refresh
                 ]
                 match state with
