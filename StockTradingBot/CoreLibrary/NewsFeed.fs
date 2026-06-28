@@ -69,7 +69,7 @@ module NewsItemFilter =
 
     /// The given item was published recently?
     let isRecent utcNow : NewsItemFilter =
-        let timeSpan = TimeSpan.FromHours(8)
+        let timeSpan = TimeSpan.FromHours(4)
         fun item ->
             utcNow - item.PublishDate.UtcDateTime < timeSpan
 

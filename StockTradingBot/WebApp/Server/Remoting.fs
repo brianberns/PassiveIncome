@@ -19,7 +19,7 @@ module Api =
     let private runResults = LinkedList<RunResult>()
 
     let runLoop context =
-        let delay = TimeSpan.FromHours(1)
+        let delay = TimeSpan.FromMinutes(15.0)
         async {
             for result in Run.runLoop context delay do
                 lock runResults (fun () ->
