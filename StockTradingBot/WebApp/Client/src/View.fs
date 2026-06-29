@@ -105,6 +105,15 @@ module View =
                     Html.table [
                         prop.className "positions"
                         prop.children [
+                            Html.thead [
+                                Html.tr [
+                                    Html.th [ prop.text "Asset" ]
+                                    Html.th [ prop.className "num"; prop.text "Shares" ]
+                                    Html.th [ prop.className "num"; prop.text "Price" ]
+                                    Html.th [ prop.className "num"; prop.text "Value" ]
+                                    Html.th [ prop.className "num"; prop.text "Change" ]
+                                ]
+                            ]
                             Html.tbody [
                                 for (asset, value) in Map.toSeq portfolio.PositionMap do
                                     Html.tr [
@@ -114,11 +123,11 @@ module View =
                                         ]
                                         Html.td [
                                             prop.className "num"
-                                            prop.text $"{formatQty value.Quantity} shares"
+                                            prop.text (formatQty value.Quantity)
                                         ]
                                         Html.td [
                                             prop.className "num"
-                                            prop.text $"@ {value.CurrentPrice}"
+                                            prop.text (string value.CurrentPrice)
                                         ]
                                         Html.td [
                                             prop.className "num value"

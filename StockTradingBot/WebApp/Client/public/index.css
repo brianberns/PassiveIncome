@@ -139,6 +139,21 @@ body {
     border-collapse: collapse;
 }
 
+    .positions th {
+        padding: 4px 8px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+    }
+
+        .positions th.num {
+            text-align: right;
+        }
+
     .positions td {
         padding: 4px 8px;
         border-bottom: 1px solid #f0f2f4;
