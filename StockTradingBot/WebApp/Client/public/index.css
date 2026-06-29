@@ -172,12 +172,21 @@ body {
             color: var(--red);
         }
 
-.summary {
-    display: flex;
-    gap: 24px;
-    margin-top: 10px;
-    font-size: 0.95rem;
-}
+    .positions tr.summary-row td {
+        border-bottom: none;
+    }
+
+    .positions tr.summary-row.divider td {
+        border-top: 2px solid var(--border);
+    }
+
+    .positions tr.summary-row.total td {
+        font-weight: 700;
+    }
+
+        .positions td.summary-label {
+            color: var(--text);
+        }
 
 /* Market assessment */
 

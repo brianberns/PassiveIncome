@@ -97,6 +97,26 @@ module View =
                 ]
             ]
 
+    /// Renders a label/value row at the foot of the positions table
+    /// (e.g. cash, total). Only the Asset and Value columns are filled.
+    let private summaryRow extraClasses label (amount : Money) =
+        Html.tr [
+            prop.classes [ "summary-row"; yield! extraClasses ]
+            prop.children [
+                Html.td [
+                    prop.className "summary-label"
+                    prop.text (label : string)
+                ]
+                Html.td []
+                Html.td []
+                Html.td [
+                    prop.className "num value"
+                    prop.text (string amount)
+                ]
+                Html.td []
+            ]
+        ]
+
     /// Renders a portfolio.
     let private renderPortfolio result =
         section "Portfolio" [
@@ -143,23 +163,8 @@ module View =
                                             prop.text (formatNetChange value.NetChange)
                                         ]
                                     ]
-                            ]
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "summary"
-                        prop.children [
-                            Html.span [
-                                prop.children [
-                                    Html.text "Cash: "
-                                    Html.strong (string portfolio.TradableCash)
-                                ]
-                            ]
-                            Html.span [
-                                prop.children [
-                                    Html.text "Total value: "
-                                    Html.strong (string portfolio.TotalValue)
-                                ]
+                                summaryRow [] "Cash" portfolio.TradableCash
+                                summaryRow [ "divider"; "total" ] "Total value" portfolio.TotalValue
                             ]
                         ]
                     ]
