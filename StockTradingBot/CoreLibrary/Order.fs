@@ -53,17 +53,23 @@ module Order =
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
+    /// Buys the given asset.
+    let private buyAsset broker asset money reason =
+        async {
+            let! result = broker.Buy asset money
+            return OrderResult.create asset reason result
+        }
+
     /// Buys the given assets using the given cash.
     let private buyAssets broker (assetTuples : _[]) (cash : Money) =
         let portion = cash / decimal assetTuples.Length   // amount to spend on each asset
-        assetTuples
-            |> Seq.map (fun (asset, reason) ->
-                async {
-                    let! result =
-                        broker.Buy asset portion
-                    return OrderResult.create asset reason result
-                })
-            |> Async.Sequential   // avoid hammering the broker API
+        if portion > Money.One then                       // Alpaca: notional amount must be >= 1.00
+            assetTuples
+                |> Seq.map (fun (asset, reason) ->
+                    buyAsset broker asset portion reason)
+                |> Async.Sequential   // avoid hammering the broker API
+        else
+            async { return Array.empty }
 
     /// Places orders based on the given assessment.
     let placeOrders broker portfolio assessment =

@@ -38,7 +38,7 @@ body {
 
 .source-link {
     font-size: 0.85rem;
-    margin: 0 0 4px;
+    margin: 0 0 20px;
 }
 
 .source-link a {
@@ -48,12 +48,6 @@ body {
 
 .source-link a:hover {
     text-decoration: underline;
-}
-
-.refresh-note {
-    color: var(--muted);
-    font-size: 0.85rem;
-    margin: 0 0 20px;
 }
 
 .muted {
