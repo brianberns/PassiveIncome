@@ -272,11 +272,11 @@ module View =
                     ]
                 ]
 
+                    // the portfolio is fetched whether or not the market is open
+                renderPortfolio runResult.PortfolioResult
+
                     // is the market open?
                 if runResult.IsMarketOpen then
-                    match runResult.PortfolioResultOpt with
-                        | Some portfolioResult -> renderPortfolio portfolioResult
-                        | None -> Html.none
                     match runResult.MarketAssessmentResultOpt with
                         | Some assessmentResult -> renderMarketAssessment assessmentResult
                         | None -> Html.none
