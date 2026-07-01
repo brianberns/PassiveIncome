@@ -43,7 +43,8 @@ module Api =
             let result =
                 RunResult.create
                     DateTimeOffset.Now
-                    (Some (Ok (Portfolio.create (Usd 123.4m) Map.empty)))
+                    true
+                    (Ok (Portfolio.create (Usd 123.4m) Map.empty))
                     None
                     Array.empty
                     Array.empty

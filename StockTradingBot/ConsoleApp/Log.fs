@@ -1,7 +1,5 @@
 ﻿namespace StockTradingBot
 
-open System
-
 module Log =
 
     /// Logs a portfolio.
@@ -28,8 +26,10 @@ module Log =
                 printfn $"News items: {newsItems.Length}"
             | FeedErrors errors ->
                 for error in errors do
+                    printfn ""
                     printfn $"News feed error: {error.FeedName}: {error.Message}"
             | MarketAssessmentResult.AgentError message ->
+                printfn ""
                 printfn $"Agent error: {message}"
 
     /// Logs asset orders.
@@ -58,7 +58,8 @@ module Log =
                     | Error message ->
                         printfn $"Buy error: {message}"
         else
-            printfn "None"
+            printfn ""
+            printfn "No orders"
 
     /// Logs a run.
     let logRun runResult =
@@ -68,17 +69,22 @@ module Log =
         printfn ""
         printfn $"{runResult.StartTime}"
 
-            // is market open?
+        logPortfolio runResult.PortfolioResult
+
         if runResult.IsMarketOpen then
-            Option.iter
-                logPortfolio
-                runResult.PortfolioResultOpt
+
+            printfn ""
+            printfn "Market is open"
+
             Option.iter
                 logMarketAssessment
                 runResult.MarketAssessmentResultOpt
+
             logAssetOrders
                 runResult.SellResults runResult.BuyResults
+
         else
+            printfn ""
             printfn "Market is closed"
 
         let duration =

@@ -7,9 +7,12 @@ type RunResult =
     {
         /// Start of run.
         StartTime : DateTimeOffset
-        
+
+        /// Indicates whether the market is open.
+        IsMarketOpen : bool
+
         /// Portfolio at start of run.
-        PortfolioResultOpt : Option<Result<Portfolio, string>>
+        PortfolioResult : Result<Portfolio, string (*message*)>
 
         /// Market assessment.
         MarketAssessmentResultOpt : Option<MarketAssessmentResult>
@@ -24,27 +27,21 @@ type RunResult =
         EndTime : DateTimeOffset
     }
 
-    /// Indicates whether the market is open.
-    member result.IsMarketOpen =
-        assert(result.PortfolioResultOpt.IsSome
-            || (result.MarketAssessmentResultOpt.IsNone
-                && result.SellResults.Length = 0
-                && result.BuyResults.Length = 0))
-        result.PortfolioResultOpt.IsSome   // in lieu of an actual flag, this is good enough
-
 module RunResult =
 
     /// Creates a run result.
     let create
         startTime
-        portfolioResultOpt
+        isMarketOpen
+        portfolioResult
         marketAssessmentResultOpt
         sellResults
         buyResults
         endTime =
         {
             StartTime = startTime
-            PortfolioResultOpt = portfolioResultOpt
+            IsMarketOpen = isMarketOpen
+            PortfolioResult = portfolioResult
             MarketAssessmentResultOpt = marketAssessmentResultOpt
             SellResults = sellResults
             BuyResults = buyResults
@@ -52,10 +49,11 @@ module RunResult =
         }
 
     /// Creates a run result.
-    let createWithoutAssessment startTime portfolioResultOpt endTime =
+    let createWithoutAssessment startTime isMarketOpen portfolioResult endTime =
         create
             startTime
-            portfolioResultOpt
+            isMarketOpen
+            portfolioResult
             None
             Array.empty
             Array.empty
@@ -105,52 +103,69 @@ module Run =
                 // request market assessment from agent
             let! assessmentResult =
                 MarketAssessment.getAsync
-                    context.HttpClient
-                    context.Agent
+                    context.HttpClient context.Agent
+
+                // prepare to create result
+            let create sellResults buyResults =
+                RunResult.create
+                    startTime
+                    true
+                    (Ok portfolio)
+                    (Some assessmentResult)
+                    sellResults
+                    buyResults
+                    DateTimeOffset.Now
 
             match assessmentResult with
+
+                    // place orders based on successful assessment
                 | MarketAssessmentResult.Success (_, assessment) ->
-
-                        // place orders based on assessment
                     let! sellResults, buyResults =
-                        Order.placeOrders context.Broker portfolio assessment
+                        Order.placeOrders
+                            context.Broker portfolio assessment
+                    return create sellResults buyResults
 
-                    return RunResult.create
-                        startTime
-                        (Some (Ok portfolio))
-                        (Some assessmentResult)
-                        sellResults
-                        buyResults
-                        DateTimeOffset.Now
+                    // assessment failed
                 | _ ->
-                    return RunResult.createWithoutAssessment
-                        startTime
-                        (Some (Ok portfolio))
-                        DateTimeOffset.Now
+                    return create Array.empty Array.empty
         }
 
     /// Runs once using the given context.
     let runOne context =
         async {
             let startTime = DateTimeOffset.Now
-            match! context.Broker.IsMarketOpen () with
-                | Ok true ->
-                    match! context.Broker.GetPortfolio () with
-                        | Ok portfolio ->
+
+                // start by getting the current portfolio
+            match! context.Broker.GetPortfolio () with
+                | Ok portfolio ->
+
+                        // then check if the market is open
+                    match! context.Broker.IsMarketOpen () with
+
+                            // perform market assessment
+                        | Ok true ->
                             return! runAssessment
                                 context startTime portfolio
-                        | Error exn ->
+
+                            // market is closed
+                        | Ok false ->
+                            return RunResult.createWithoutAssessment
+                                startTime false (Ok portfolio) DateTimeOffset.Now
+
+                            // couldn't determine whether market is open
+                        | Error msg ->
                             return RunResult.createWithoutAssessment
                                 startTime
-                                (Some (Error exn))
+                                false         // hack: claim market is closed
+                                (Error msg)   // hack: swallow portfolio, report error instead
                                 DateTimeOffset.Now
-                | Ok false ->
-                    return RunResult.createWithoutAssessment
-                        startTime None DateTimeOffset.Now
-                | Error exn ->
+
+                    // couldn't get portfolio
+                | Error msg ->
                     return RunResult.createWithoutAssessment
                         startTime
-                        (Some (Error exn))
+                        false   // assume market is closed
+                        (Error msg)
                         DateTimeOffset.Now
         }
 
