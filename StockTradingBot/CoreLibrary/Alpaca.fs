@@ -173,7 +173,7 @@ module AlpacaDummy =
                     async {
                         return Ok (
                             FilledOrderDetail.create
-                                (Usd 10m)
+                                (Usd 100m)
                                 quantity)
                     }
             Buy =
