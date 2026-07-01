@@ -56,7 +56,7 @@ module Model =
     let openRouter =
         {
             Name = "OpenRouter"
-            Id = "openrouter/owl-alpha"
+            Id = "openai/gpt-oss-120b:free"
             ApiKeyName = "OpenRouter:ApiKey"
             Endpoint = "https://openrouter.ai/api/v1"
             SupportsJsonSchema = true
