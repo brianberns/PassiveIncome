@@ -118,6 +118,15 @@ body {
     font-family: "SF Mono", Menlo, Consolas, monospace;
 }
 
+a.symbol {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+    a.symbol:hover {
+        text-decoration: underline;
+    }
+
 .num {
     font-variant-numeric: tabular-nums;
 }

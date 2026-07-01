@@ -49,6 +49,17 @@ module View =
             ]
         ]
 
+    /// Renders an asset symbol as a link to its Yahoo Finance page.
+    let private renderSymbol asset =
+        let symbol = string asset
+        Html.a [
+            prop.className "symbol"
+            prop.href $"https://finance.yahoo.com/quote/{symbol}"
+            prop.target "_blank"
+            prop.rel "noopener noreferrer"
+            prop.text symbol
+        ]
+
     /// Renders an error message.
     let private errorRow (message : string) =
         Html.div [
@@ -138,8 +149,7 @@ module View =
                                 for (asset, value) in Map.toSeq portfolio.PositionMap do
                                     Html.tr [
                                         Html.td [
-                                            prop.className "symbol"
-                                            prop.text (string asset)
+                                            prop.children [ renderSymbol asset ]
                                         ]
                                         Html.td [
                                             prop.className "num"
@@ -202,10 +212,7 @@ module View =
                             prop.className $"badge {badgeClass}"
                             prop.text (label : string)
                         ]
-                        Html.span [
-                            prop.className "symbol"
-                            prop.text (string orderResult.Asset)
-                        ]
+                        renderSymbol orderResult.Asset
                     ]
                 ]
                 Html.div [
