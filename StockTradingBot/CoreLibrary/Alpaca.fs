@@ -59,6 +59,37 @@ module Alpaca =
                 return Error exn.Message
         } |> Async.AwaitTask
 
+    /// Gets recent change in the given asset's value.
+    let private getTrend api asset =
+        task {
+            try
+                    // get latest price
+                let! latest =
+                    LatestMarketDataRequest(asset.Symbol)
+                        |> api.DataClient.GetLatestTradeAsync
+
+                    // get previous price
+                let now = DateTime.UtcNow.AddMinutes(-15.1)   // free API imposes 15 minute delay
+                let! page =
+                    HistoricalBarsRequest(
+                        asset.Symbol,
+                        now - TimeSpan.FromHours(1),
+                        now,
+                        BarTimeFrame.Hour)
+                        |> api.DataClient.ListHistoricalBarsAsync
+
+                    // compute change
+                match Seq.tryHead page.Items with
+                    | Some recent ->
+                        let change =
+                            (latest.Price - recent.Close) / recent.Close
+                        return Ok (Some change)
+                    | None -> return Ok None
+
+            with exn ->
+                return Error exn.Message
+        } |> Async.AwaitTask
+
     /// Waits a while (but not forever) for the given order
     /// to fill, and then answers its average fill price
     /// and filled quantity.
@@ -154,6 +185,7 @@ module Alpaca =
         {
             GetPortfolio = fun () -> getPortfolio api
             IsMarketOpen = fun () -> isMarketOpen api
+            GetTrend = getTrend api
             Sell = sell api
             Buy = buy api
         }
@@ -168,6 +200,8 @@ module AlpacaDummy =
                 impl.GetPortfolio
             IsMarketOpen =
                 fun () -> async { return Ok true }
+            GetTrend =
+                impl.GetTrend
             Sell =
                 fun asset quantity ->
                     async {

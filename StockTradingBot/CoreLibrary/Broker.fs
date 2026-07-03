@@ -38,6 +38,12 @@ type Broker =
         IsMarketOpen :
             unit -> Async<Result<bool, string (*message*)>>
 
+        /// Gets recent change in the given asset's value.
+        GetTrend :
+            Asset -> Async<
+                Result<Option<decimal> (*change*),
+                string (*message*)>>
+
         /// Sells the given quantity of the given asset.
         Sell :
             Asset -> decimal (*quantity*) -> Async<TradeResult>
