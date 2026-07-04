@@ -154,13 +154,6 @@ module Order =
                 PriceChangeOpt = priceChangeOpt
             }
 
-    /// Gets recent change in the given asset's price.
-    let private getPriceChange broker asset reason =
-        async {
-            let! result = broker.GetPriceChange asset
-            return asset, reason, result
-        }
-
     /// Buys the given asset.
     let private buyAsset broker buyRequest money =
         async {
@@ -198,7 +191,9 @@ module Order =
             let! priceChangeResultTuples =
                 assetReasons
                     |> Seq.map (fun (asset, reason) ->
-                        getPriceChange broker asset reason)
+                        broker.GetPriceChange asset
+                            |> Async.map (fun result ->
+                                asset, reason, result))
                     |> Async.Sequential
 
                 // handle errors
