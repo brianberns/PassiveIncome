@@ -172,16 +172,57 @@ module Order =
                 result
         }
 
-    /// Buys the given assets using the given cash.
-    let private buyAssets broker (buyRequests : _[]) (cash : Money) =
-        let portion = cash / decimal buyRequests.Length   // amount to spend on each asset
-        if portion > Money.One then                       // Alpaca: notional amount must be >= 1.00
+    /// Buys the given assets using the given money.
+    let private buyAssets broker (buyRequests : _[]) (money : Money) =
+        let portion = money / decimal buyRequests.Length   // amount to spend on each asset
+        if portion > Money.One then                        // Alpaca: notional amount must be >= 1.00
             buyRequests
                 |> Seq.map (fun req ->
                     buyAsset broker req portion)
                 |> Async.Sequential   // avoid hammering the broker API
         else
             async { return Array.empty }
+
+    /// Buys assets using the given money.
+    let buy broker assetReasons money =
+        async {
+
+                // obtain price changes for the given assets
+            let! priceChangeResultTuples =
+                assetReasons
+                    |> Seq.map (fun (asset, reason) ->
+                        getPriceChange broker asset reason)
+                    |> Async.Sequential
+
+                // handle errors
+            let buyRequests, priceChangeErrors =
+                priceChangeResultTuples
+                    |> Array.partitionWith (fun (asset, reason, result) ->
+                        match result with
+                            | Ok priceChangeOpt ->
+                                Choice1Of2 (
+                                    BuyRequest.create
+                                        asset reason priceChangeOpt)
+                            | Error msg ->
+                                Choice2Of2 (
+                                    OrderResult.create
+                                        asset reason None (Error msg)))   // store price change error in order result
+
+                // don't buy assets with a negative price change
+            let buyRequests =
+                buyRequests
+                    |> Array.choose (fun req ->
+                        match req.PriceChangeOpt with
+                            | Some priceChange ->
+                                if priceChange >= 0m then Some req
+                                else None
+                            | None -> Some req)
+
+                // execute purchase
+            let! buyResults = buyAssets broker buyRequests money
+
+            return Array.append buyResults priceChangeErrors
+        }
 
     /// Places orders based on the given assessment.
     let placeOrders broker portfolio assessment =
@@ -201,31 +242,9 @@ module Order =
 
                 // buy assets with cash on hand
             if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
-                let! priceChangeResultTuples =
-                    buyMap
-                        |> Map.toSeq
-                        |> Seq.map (fun (asset, reason) ->
-                            getPriceChange broker asset reason)
-                        |> Async.Sequential
-                let buyRequests, priceChangeErrors =
-                    priceChangeResultTuples
-                        |> Array.partitionWith (fun (asset, reason, result) ->
-                            match result with
-                                | Ok priceChangeOpt ->
-                                    Choice1Of2 (BuyRequest.create asset reason priceChangeOpt)
-                                | Error msg ->
-                                    Choice2Of2 (OrderResult.create asset reason None (Error msg)))
-                let buyRequests =
-                    buyRequests
-                        |> Array.choose (fun req ->
-                            match req.PriceChangeOpt with
-                                | Some priceChange ->
-                                    if priceChange > 0m then Some req
-                                    else None
-                                | None -> Some req)
                 let! buyResults =
-                    buyAssets broker buyRequests cash
-                let buyResults = Array.append buyResults priceChangeErrors
+                    let assetReasons = Map.toSeq buyMap
+                    buy broker assetReasons cash
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
