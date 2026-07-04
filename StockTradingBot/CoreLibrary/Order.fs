@@ -73,6 +73,32 @@ module Order =
                 Reason = reason
             }
 
+    /// Prepares to sell assets in the given portfolio, where
+    /// appropriate.
+    let private getSellRequests
+        portfolio (buyMap : Map<_, _>) (sellMap : Map<_, _>) =
+        [
+            for (KeyValue(asset, value)) in portfolio.PositionMap do
+                match Map.tryFind asset sellMap with
+
+                        // sell, explicit reason
+                    | Some reason ->
+                        SellRequest.create
+                            asset value.Quantity reason
+
+                        // hold, possibly buying more of this asset
+                    | None when buyMap.ContainsKey(asset) ->
+                        ()
+
+                        // sell, to generate cash
+                    | None when buyMap.Count > 0 ->
+                        SellRequest.create
+                            asset value.Quantity "Making room in portfolio."
+
+                        // hold, no reason to sell
+                    | None -> ()
+        ]
+
     /// Sells the given asset quantities.
     let private sellAssetQuantities broker saleRequests =
         saleRequests
@@ -146,28 +172,7 @@ module Order =
             let buyMap, sellMap = getTrendMaps assessment
 
                 // decide what to do with assets in existing portfolio
-            let sellRequests =
-                [
-                    for (KeyValue(asset, value)) in portfolio.PositionMap do
-                        match Map.tryFind asset sellMap with
-
-                                // sell, explicit reason
-                            | Some reason ->
-                                SellRequest.create
-                                    asset value.Quantity reason
-
-                                // hold, possibly buying more of this asset
-                            | None when buyMap.ContainsKey(asset) ->
-                                ()
-
-                                // sell, to generate cash
-                            | None when buyMap.Count > 0 ->
-                                SellRequest.create
-                                    asset value.Quantity "Making room in portfolio."
-
-                                // hold, no reason to sell
-                            | None -> ()
-                ]
+            let sellRequests = getSellRequests portfolio buyMap sellMap
 
                 // sell first to generate cash
             let! sellResults = sellAssetQuantities broker sellRequests
