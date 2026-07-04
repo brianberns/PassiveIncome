@@ -154,6 +154,13 @@ module Order =
                 PriceChangeOpt = priceChangeOpt
             }
 
+    /// Gets recent change in the given asset's price.
+    let private getPriceChange broker asset reason =
+        async {
+            let! result = broker.GetPriceChange asset
+            return asset, reason, result
+        }
+
     /// Buys the given asset.
     let private buyAsset broker buyRequest money =
         async {
@@ -194,13 +201,31 @@ module Order =
 
                 // buy assets with cash on hand
             if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
+                let! priceChangeResultTuples =
+                    buyMap
+                        |> Map.toSeq
+                        |> Seq.map (fun (asset, reason) ->
+                            getPriceChange broker asset reason)
+                        |> Async.Sequential
+                let buyRequests, priceChangeErrors =
+                    priceChangeResultTuples
+                        |> Array.partitionWith (fun (asset, reason, result) ->
+                            match result with
+                                | Ok priceChangeOpt ->
+                                    Choice1Of2 (BuyRequest.create asset reason priceChangeOpt)
+                                | Error msg ->
+                                    Choice2Of2 (OrderResult.create asset reason None (Error msg)))
+                let buyRequests =
+                    buyRequests
+                        |> Array.choose (fun req ->
+                            match req.PriceChangeOpt with
+                                | Some priceChange ->
+                                    if priceChange > 0m then Some req
+                                    else None
+                                | None -> Some req)
                 let! buyResults =
-                    let buyRequests =
-                        buyMap
-                            |> Map.toArray
-                            |> Array.map (fun (asset, reason) ->
-                                BuyRequest.create asset reason None)
                     buyAssets broker buyRequests cash
+                let buyResults = Array.append buyResults priceChangeErrors
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
