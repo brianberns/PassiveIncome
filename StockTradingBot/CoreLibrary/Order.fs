@@ -183,8 +183,15 @@ module Order =
         else
             async { return Array.empty }
 
+    /// Sells assets.
+    let private placeSellOrders broker portfolio buyMap sellMap =
+        async {
+            let sellRequests = getSellRequests portfolio buyMap sellMap
+            return! sellAssetQuantities broker sellRequests
+        }
+
     /// Buys assets using the given money.
-    let buy broker assetReasons money =
+    let private placeBuyOrders broker assetReasons money =
         async {
 
                 // obtain price changes for the given assets
@@ -233,18 +240,15 @@ module Order =
                 // organize assets by trend (positive/negative)
             let buyMap, sellMap = getTrendMaps assessment
 
-                // decide what to do with assets in existing portfolio
-            let sellRequests = getSellRequests portfolio buyMap sellMap
-
                 // sell first to generate cash
-            let! sellResults = sellAssetQuantities broker sellRequests
+            let! sellResults = placeSellOrders broker portfolio buyMap sellMap
             let cash = getSpendableCash portfolio sellResults
 
                 // buy assets with cash on hand
             if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
                 let! buyResults =
                     let assetReasons = Map.toSeq buyMap
-                    buy broker assetReasons cash
+                    placeBuyOrders broker assetReasons cash
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
