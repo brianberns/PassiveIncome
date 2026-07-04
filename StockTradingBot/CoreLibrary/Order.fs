@@ -9,6 +9,9 @@ type OrderResult =
         /// Reason for trade.
         Reason : string
 
+        /// Relative price change, if known.
+        PriceChangeOpt : Option<decimal>
+
         /// Result of trade.
         Result : Result<FilledOrderDetail, string (*message*)>
     }
@@ -16,10 +19,11 @@ type OrderResult =
 module OrderResult =
 
     /// Creates an order result.
-    let create asset reason result =
+    let create asset reason priceChangeOpt result =
         {
             Asset = asset
             Reason = reason
+            PriceChangeOpt = priceChangeOpt
             Result = result
         }
 
@@ -29,14 +33,55 @@ open FSharp.Control
 
 module Order =
 
+    /// Organizes assets by trend (positive/negative).
+    let private getTrendMaps assessment =
+
+        let lookup =
+            let trendMap =
+                assessment.AssetAssessments
+                    |> Array.groupBy _.Trend
+                    |> Array.map (fun (trend, group) ->
+                        let map =
+                            group
+                                |> Array.map (fun aa ->
+                                    aa.Asset, aa.Reason)
+                                |> Map
+                        assert(map.Count = group.Length)
+                        trend, map)
+                    |> Map
+            fun trend ->
+                trendMap
+                    |> Map.tryFind trend
+                    |> Option.defaultValue Map.empty
+
+        lookup Trend.Positive,
+        lookup Trend.Negative
+
+    type private SellRequest =
+        {
+            Asset : Asset
+            Quantity : decimal
+            Reason : string
+        }
+
+    module private SellRequest =
+
+        let create asset quantity reason =
+            {
+                Asset = asset
+                Quantity = quantity
+                Reason = reason
+            }
+
     /// Sells the given asset quantities.
-    let private sellAssetQuantities broker assetTuples =
-        assetTuples
-            |> Seq.map (fun (asset, quantity, reason) ->
+    let private sellAssetQuantities broker saleRequests =
+        saleRequests
+            |> Seq.map (fun req ->
                 async {
                     let! result =
-                        broker.Sell asset quantity
-                    return OrderResult.create asset reason result
+                        broker.Sell req.Asset req.Quantity
+                    return OrderResult.create
+                        req.Asset req.Reason None result
                 })
             |> Async.Sequential   // avoid hammering the broker API
 
@@ -53,20 +98,40 @@ module Order =
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
+    type private BuyRequest =
+        {
+            Asset : Asset
+            Reason : string
+            PriceChangeOpt : Option<decimal>
+        }
+
+    module private BuyRequest =
+
+        let create asset reason priceChangeOpt =
+            {
+                Asset = asset
+                Reason = reason
+                PriceChangeOpt = priceChangeOpt
+            }
+
     /// Buys the given asset.
-    let private buyAsset broker asset money reason =
+    let private buyAsset broker buyRequest money =
         async {
-            let! result = broker.Buy asset money
-            return OrderResult.create asset reason result
+            let! result = broker.Buy buyRequest.Asset money
+            return OrderResult.create
+                buyRequest.Asset
+                buyRequest.Reason
+                buyRequest.PriceChangeOpt
+                result
         }
 
     /// Buys the given assets using the given cash.
-    let private buyAssets broker (assetTuples : _[]) (cash : Money) =
-        let portion = cash / decimal assetTuples.Length   // amount to spend on each asset
+    let private buyAssets broker (buyRequests : _[]) (cash : Money) =
+        let portion = cash / decimal buyRequests.Length   // amount to spend on each asset
         if portion > Money.One then                       // Alpaca: notional amount must be >= 1.00
-            assetTuples
-                |> Seq.map (fun (asset, reason) ->
-                    buyAsset broker asset portion reason)
+            buyRequests
+                |> Seq.map (fun req ->
+                    buyAsset broker req portion)
                 |> Async.Sequential   // avoid hammering the broker API
         else
             async { return Array.empty }
@@ -78,56 +143,45 @@ module Order =
                 |> Option.isNone)
         async {
                 // organize assets by trend (positive/negative)
-            let lookup =
-                let trendMap =
-                    assessment.AssetAssessments
-                        |> Array.groupBy _.Trend
-                        |> Array.map (fun (trend, group) ->
-                            let map =
-                                group
-                                    |> Array.map (fun aa ->
-                                        aa.Asset, aa.Reason)
-                                    |> Map
-                            assert(map.Count = group.Length)
-                            trend, map)
-                        |> Map
-                fun trend ->
-                    trendMap
-                        |> Map.tryFind trend
-                        |> Option.defaultValue Map.empty
-            let buyMap = lookup Trend.Positive
-            let sellMap = lookup Trend.Negative
+            let buyMap, sellMap = getTrendMaps assessment
 
-                // decide what to do with all assets in portfolio
-            let sellTuples =
+                // decide what to do with assets in existing portfolio
+            let sellRequests =
                 [
                     for (KeyValue(asset, value)) in portfolio.PositionMap do
                         match Map.tryFind asset sellMap with
 
                                 // sell, explicit reason
                             | Some reason ->
-                                asset, value.Quantity, reason
+                                SellRequest.create
+                                    asset value.Quantity reason
 
-                                // hold, buying more of this asset
-                            | None when buyMap.ContainsKey(asset) -> ()
+                                // hold, possibly buying more of this asset
+                            | None when buyMap.ContainsKey(asset) ->
+                                ()
 
                                 // sell, to generate cash
                             | None when buyMap.Count > 0 ->
-                                asset, value.Quantity, "Making room in portfolio."
+                                SellRequest.create
+                                    asset value.Quantity "Making room in portfolio."
 
                                 // hold, no reason to sell
                             | None -> ()
                 ]
 
                 // sell first to generate cash
-            let! sellResults = sellAssetQuantities broker sellTuples
+            let! sellResults = sellAssetQuantities broker sellRequests
             let cash = getSpendableCash portfolio sellResults
 
                 // buy assets with cash on hand
             if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
                 let! buyResults =
-                    let buyTuples = Map.toArray buyMap
-                    buyAssets broker buyTuples cash
+                    let buyRequests =
+                        buyMap
+                            |> Map.toArray
+                            |> Array.map (fun (asset, reason) ->
+                                BuyRequest.create asset reason None)
+                    buyAssets broker buyRequests cash
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
