@@ -27,7 +27,7 @@ module Program =
         {|
             UserAgent = "StockTradingBot/0.1 (mailto:brianberns@gmail.com)"
 #if DEBUG
-            Model = Model.groq
+            Model = Model.gitHub
             CreateBroker = AlpacaDummy.createBroker
             Run = runOne
 #else

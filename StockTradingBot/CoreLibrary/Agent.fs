@@ -62,6 +62,15 @@ module Model =
             SupportsJsonSchema = true
         }
 
+    let gitHub =
+        {
+            Name = "GitHub"
+            Id = "openai/gpt-4.1"
+            ApiKeyName = "GitHub:Token"
+            Endpoint = "https://models.github.ai/inference"
+            SupportsJsonSchema = true
+        }
+
 /// Decision-making agent.
 type Agent =
     {
