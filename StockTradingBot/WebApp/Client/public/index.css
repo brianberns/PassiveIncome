@@ -305,6 +305,13 @@ a.symbol {
     margin-bottom: 2px;
 }
 
+.order-change {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 2px;
+}
+
 .order-line {
     display: inline-flex;
     flex-wrap: wrap;

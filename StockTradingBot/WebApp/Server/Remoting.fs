@@ -58,7 +58,7 @@ module Api =
         {|
             UserAgent = "StockTradingBot/0.1 (mailto:brianberns@gmail.com)"
 #if DEBUG
-            Model = Model.openRouter
+            Model = Model.gitHub
             CreateBroker = AlpacaDummy.createBroker
 #else
             Model = Model.gemini
