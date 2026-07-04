@@ -59,8 +59,8 @@ module Alpaca =
                 return Error exn.Message
         } |> Async.AwaitTask
 
-    /// Gets recent change in the given asset's value.
-    let private getTrend api asset =
+    /// Gets recent change in the given asset's price.
+    let private getPriceChange api asset =
         task {
             try
                     // get latest price
@@ -185,7 +185,7 @@ module Alpaca =
         {
             GetPortfolio = fun () -> getPortfolio api
             IsMarketOpen = fun () -> isMarketOpen api
-            GetTrend = getTrend api
+            GetPriceChange = getPriceChange api
             Sell = sell api
             Buy = buy api
         }
@@ -200,8 +200,8 @@ module AlpacaDummy =
                 impl.GetPortfolio
             IsMarketOpen =
                 fun () -> async { return Ok true }
-            GetTrend =
-                impl.GetTrend
+            GetPriceChange =
+                impl.GetPriceChange
             Sell =
                 fun asset quantity ->
                     async {
