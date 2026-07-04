@@ -12,7 +12,10 @@ module Alpaca =
     /// Alpaca API.
     type private Api =
         {
+            /// Data client. (E.g. price history.)
             DataClient : IAlpacaDataClient
+
+            /// Trading client. (E.g. buy/sell assets.)
             TradingClient : IAlpacaTradingClient
         }
 
@@ -78,11 +81,11 @@ module Alpaca =
                         BarTimeFrame.Hour)
                         |> api.DataClient.ListHistoricalBarsAsync
 
-                    // compute change
+                    // compute percent change
                 match Seq.tryHead page.Items with
                     | Some recent ->
                         let change =
-                            (latest.Price - recent.Close) / recent.Close
+                            100.0m * (latest.Price - recent.Close) / recent.Close
                         return Ok (Some change)
                     | None -> return Ok None
 
