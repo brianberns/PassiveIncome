@@ -9,7 +9,7 @@ type OrderResult =
         /// Reason for trade.
         Reason : string
 
-        /// Relative price change, if known.
+        /// Relative price change of asset, if known.
         PriceChangeOpt : Option<decimal>
 
         /// Result of trade.
@@ -57,15 +57,22 @@ module Order =
         lookup Trend.Positive,
         lookup Trend.Negative
 
+    /// Request to sell an asset.
     type private SellRequest =
         {
+            /// Asset to sell.
             Asset : Asset
+
+            /// Quantity of asset to sell.
             Quantity : decimal
+
+            /// Reason for sale.
             Reason : string
         }
 
     module private SellRequest =
 
+        /// Creates a sell request.
         let create asset quantity reason =
             {
                 Asset = asset
@@ -124,15 +131,22 @@ module Order =
                         | Error _ -> Money.Zero)
         portfolio.TradableCash + totalSales - slush
 
+    /// Request to buy an asset.
     type private BuyRequest =
         {
+            /// Asset to buy.
             Asset : Asset
+
+            /// Reason for purchase.
             Reason : string
+
+            /// Relative price change of asset, if known.
             PriceChangeOpt : Option<decimal>
         }
 
     module private BuyRequest =
 
+        // Creates a buy request.
         let create asset reason priceChangeOpt =
             {
                 Asset = asset
