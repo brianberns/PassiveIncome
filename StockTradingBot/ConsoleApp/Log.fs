@@ -41,6 +41,9 @@ module Log =
                 printfn ""
                 printfn $"{sellResult.Asset}:"
                 printfn $"{sellResult.Reason}"
+                match sellResult.PriceChangeOpt with
+                    | Some priceChange -> printfn $"Price change: %.2f{100.0m * priceChange}%%"
+                    | None -> ()
                 match sellResult.Result with
                     | Ok detail ->
                         printfn $"Sold %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
@@ -51,6 +54,9 @@ module Log =
                 printfn ""
                 printfn $"{buyResult.Asset}:"
                 printfn $"{buyResult.Reason}"
+                match buyResult.PriceChangeOpt with
+                    | Some priceChange -> printfn $"Price change: %.2f{100.0m * priceChange}%%"
+                    | None -> ()
                 match buyResult.Result with
                     | Ok detail ->
                         printfn $"Bought %.3f{detail.FilledQuantity} shares @ {detail.AverageFillPrice}: \
