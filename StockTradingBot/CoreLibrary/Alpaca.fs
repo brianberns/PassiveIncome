@@ -24,12 +24,9 @@ module Alpaca =
         task {
             try
                     // get available cash
-#if DAY_TRADER_BUG_FIXED
                 let! account = api.TradingClient.GetAccountAsync()
                 let cash = Usd account.TradableCash
-#else
-                let cash = Money.One   // bad assumption to work around incompatibility in Alpaca library (see https://docs.alpaca.markets/us/changelog/2026-06-03-pdt-f3c04da)
-#endif
+
                     // get positions
                 let! positions =
                     api.TradingClient.ListPositionsAsync()
