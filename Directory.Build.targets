@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('alpaca-trade-api-csharp'))">
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+</Project>

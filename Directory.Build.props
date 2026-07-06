@@ -5,8 +5,4 @@
   <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.fsproj'">
     <PackageReference Include="FSharp.Core" Version="10.1.202" />
   </ItemGroup>
-  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('alpaca-trade-api-csharp'))">
-    <RestoreLockedMode>false</RestoreLockedMode>
-    <NuGetAudit>false</NuGetAudit>
-  </PropertyGroup>
 </Project>
