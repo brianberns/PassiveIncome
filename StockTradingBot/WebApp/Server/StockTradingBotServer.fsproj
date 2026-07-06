@@ -31,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+	<ProjectReference Include="..\..\..\alpaca-trade-api-csharp\Alpaca.Markets\Alpaca.Markets.csproj" />
 	<ProjectReference Include="..\..\..\Fable.Remoting.Suave\Fable.Remoting.Suave\Fable.Remoting.Suave.fsproj" />
     <ProjectReference Include="..\..\CoreLibrary\StockTradingBot.fsproj">
       <ExcludeAssets>runtime</ExcludeAssets>
