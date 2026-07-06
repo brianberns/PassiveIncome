@@ -149,7 +149,7 @@ module Alpaca =
                     | Error statusOpt ->
                         return statusOpt
                             |> Option.map string
-                            |> Option.defaultValue "Unknown"
+                            |> Option.defaultValue "Order still in progress"
                             |> Error
             with exn ->
                 return Error exn.Message
