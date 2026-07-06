@@ -146,11 +146,10 @@ module Alpaca =
                 match! awaitOrder api posted.OrderId with
                     | Ok detail ->
                         return Ok detail
-                    | Error statusOpt ->
-                        return statusOpt
-                            |> Option.map string
-                            |> Option.defaultValue "Order still in progress"
-                            |> Error
+                    | Error (Some status) ->
+                        return Error $"Order status: {string status}"
+                    | Error None ->
+                        return Error "Order still in progress"
             with exn ->
                 return Error exn.Message
         } |> Async.AwaitTask
