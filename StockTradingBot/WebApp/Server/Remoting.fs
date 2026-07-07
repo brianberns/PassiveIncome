@@ -81,9 +81,9 @@ module Api =
         /// Program configuration.
         let config =
             ConfigurationBuilder()
-                .SetBasePath(dir)                              // web part's own directory
-                .AddUserSecrets(typeof<RunContext>.Assembly)   // local development
-                .AddJsonFile("secrets.json", optional = true)  // hosted deployment (e.g. Everleap)
+                .SetBasePath(dir)                               // web part's own directory
+                .AddUserSecrets(typeof<RunContext>.Assembly)    // local development
+                .AddJsonFile("secrets.json", optional = true)   // hosted deployment (e.g. Everleap)
                 .Build()
 
         /// Decision-making agent.
