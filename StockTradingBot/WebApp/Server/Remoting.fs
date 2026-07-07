@@ -96,9 +96,16 @@ module Api =
 
     /// Stock trading bot API.
     let stockTradingBotApi dir =
-        createContext dir
-            |> settings.Run
-            |> Async.Start
+
+            // spawn workflow that generates results
+        async {
+            try
+                do! createContext dir
+                    |> settings.Run
+            with exn ->
+                printfn $"{exn.Message}"
+        } |> Async.Start
+            
         {
             GetResults =
                 fun () ->
