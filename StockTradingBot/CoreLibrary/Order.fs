@@ -167,14 +167,17 @@ module Order =
 
     /// Buys the given assets using the given money.
     let private buyAssets broker (buyRequests : _[]) (money : Money) =
-        let portion = money / decimal buyRequests.Length   // amount to spend on each asset
-        if portion > Money.One then                        // Alpaca: notional amount must be >= 1.00
-            buyRequests
-                |> Seq.map (fun req ->
-                    buyAsset broker req portion)
-                |> Async.Sequential   // avoid hammering the broker API
-        else
-            async { return Array.empty }
+        async {
+            if buyRequests.Length > 0 then
+                let portion = money / decimal buyRequests.Length   // amount to spend on each asset
+                if portion > Money.One then                        // Alpaca: notional amount must be >= 1.00
+                    return! buyRequests
+                        |> Seq.map (fun req ->
+                            buyAsset broker req portion)
+                        |> Async.Sequential   // avoid hammering the broker API
+                else return Array.empty
+            else return Array.empty
+        }
 
     /// Sells assets.
     let private placeSellOrders broker portfolio buyMap sellMap =
