@@ -100,7 +100,7 @@ module Alpaca =
 
         let rec loop n =
             task {
-                do! Task.Delay 250
+                do! Task.Delay 500
                 let! order =
                     api.TradingClient.GetOrderAsync(orderId : Guid)
                 match order.OrderStatus with
@@ -127,7 +127,7 @@ module Alpaca =
                     | _ when n < 25 ->
                         return! loop (n + 1)
 
-                        // give up waiting (e.g. market is closed)
+                        // give up waiting (order might still fill eventually)
                     | _ ->
                         return Error None
             }
