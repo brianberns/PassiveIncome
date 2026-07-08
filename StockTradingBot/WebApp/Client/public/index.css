@@ -305,11 +305,13 @@ a.symbol {
     margin-bottom: 2px;
 }
 
-.order-change {
+.price-change {
     font-size: 0.85rem;
-    color: var(--muted);
     font-variant-numeric: tabular-nums;
-    margin-bottom: 2px;
+}
+
+.price-change.change-down {
+    color: var(--red);
 }
 
 .order-line {

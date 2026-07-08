@@ -17,10 +17,10 @@ module View =
         $"{sign}{netChange}"
 
     /// Formats a recent percent price change, with an explicit plus
-    /// sign for positive values (e.g. "Price change: +1.23%").
+    /// sign for positive values (e.g. "+1.23%").
     let private formatPriceChange (priceChange : decimal) =
         let sign = if priceChange > 0m then "+" else ""
-        $"Price change: {sign}%.2f{float priceChange}%%"
+        $"{sign}%.2f{float priceChange}%%"
 
     /// Formats a timestamp as e.g. "Jun 10, 2026 3:43 PM".
     let private formatTimestamp (time : DateTimeOffset) =
@@ -219,19 +219,22 @@ module View =
                             prop.text (label : string)
                         ]
                         renderSymbol orderResult.Asset
+                        match orderResult.PriceChangeOpt with
+                            | Some priceChange ->
+                                Html.span [
+                                    prop.classes [
+                                        "price-change"
+                                        if priceChange < 0m then "change-down"
+                                    ]
+                                    prop.text (formatPriceChange priceChange)
+                                ]
+                            | None -> Html.none
                     ]
                 ]
                 Html.div [
                     prop.className "order-reason"
                     prop.text orderResult.Reason
                 ]
-                match orderResult.PriceChangeOpt with
-                    | Some priceChange ->
-                        Html.div [
-                            prop.className "order-change"
-                            prop.text (formatPriceChange priceChange)
-                        ]
-                    | None -> Html.none
                 match orderResult.Result with
                     | Ok detail ->
                         Html.div [
