@@ -251,7 +251,7 @@ module View =
                             ]
                         ]
                     | Error message ->
-                        errorRow $"{verb} error: {message}"
+                        errorRow $"{label} error: {message}"
             ]
         ]
 
