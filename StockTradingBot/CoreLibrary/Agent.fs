@@ -62,6 +62,7 @@ module Model =
             SupportsJsonSchema = true
         }
 
+    /// GitHub.
     let gitHub =
         {
             Name = "GitHub"
