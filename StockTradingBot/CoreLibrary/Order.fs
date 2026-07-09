@@ -63,7 +63,7 @@ module Order =
                 // get price changes for the given assets
             let! results =
                 assets
-                    |> Seq.map (broker.GetPriceChange)
+                    |> Seq.map broker.GetPriceChange
                     |> Async.Sequential
 
                 // filter out assets with a negative price change
@@ -212,7 +212,7 @@ module Order =
                 assetPairs
                     |> Seq.toArray
                     |> Array.partitionWith (fun (asset, (reason, result)) ->
-                        match result with
+                        match (result : PriceChangeResult) with
                             | Ok priceChangeOpt ->
                                 Choice1Of2 (
                                     BuyRequest.create
@@ -238,14 +238,16 @@ module Order =
             let buyMap, sellMap = getTrendMaps assessment
 
                 // apply price change filter
-            let! priceChangeMap = applyPriceChangeFilter broker buyMap.Keys
+            let! priceChangeMap =
+                applyPriceChangeFilter broker buyMap.Keys
             let buyMap =
                 priceChangeMap
                     |> Map.map (fun asset result ->
                         buyMap[asset], result)
 
                 // sell first to generate cash
-            let! sellResults = placeSellOrders broker portfolio buyMap sellMap
+            let! sellResults =
+                placeSellOrders broker portfolio buyMap sellMap
             let cash = getSpendableCash portfolio sellResults
 
                 // buy assets with cash on hand

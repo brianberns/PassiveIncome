@@ -23,7 +23,11 @@ module FilledOrderDetail =
             FilledQuantity = filledQuantity
         }
 
-/// Resullt from buying/selling an asset.
+/// Price change result.
+type PriceChangeResult =
+    Result<Option<decimal> (*price change*), string (*message*)>
+
+/// Result from buying/selling an asset.
 type TradeResult =
     Result<FilledOrderDetail, string (*message*)>
 
@@ -40,9 +44,7 @@ type Broker =
 
         /// Gets recent change in the given asset's price.
         GetPriceChange :
-            Asset -> Async<
-                Result<Option<decimal> (*percent change*),
-                string (*message*)>>
+            Asset -> Async<PriceChangeResult>
 
         /// Sells the given quantity of the given asset.
         Sell :
