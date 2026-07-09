@@ -237,7 +237,7 @@ module Order =
                 // organize assets by trend (positive/negative)
             let buyMap, sellMap = getTrendMaps assessment
 
-                // apply price change filter
+                // apply price change filter to potential purchases
             let! priceChangeMap =
                 applyPriceChangeFilter broker buyMap.Keys
             let buyMap =
