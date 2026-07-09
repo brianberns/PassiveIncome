@@ -16,12 +16,3 @@ module Array =
             |> Array.map (function
                 | Choice1Of2 _ -> failwith "Unexpected"
                 | Choice2Of2 value -> value)
-
-module Async =
-
-    /// Maps over the given async computation.
-    let map mapping computation =
-        async {
-            let! x = computation
-            return mapping x
-        }

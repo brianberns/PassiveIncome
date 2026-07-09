@@ -57,6 +57,24 @@ module Order =
         lookup Trend.Positive,
         lookup Trend.Negative
 
+    /// Applies a price change filter to the given assets.
+    let private applyPriceChangeFilter broker assets =
+        async {
+                // get price changes for the given assets
+            let! results =
+                assets
+                    |> Seq.map (broker.GetPriceChange)
+                    |> Async.Sequential
+
+                // filter out assets with a negative price change
+            return Seq.zip assets results
+                |> Seq.where (fun (_, result) ->
+                    match result with
+                        | Ok (Some change) when change < 0m -> false
+                        | _ -> true)
+                |> Map
+        }
+
     /// Request to sell an asset.
     type private SellRequest =
         {
@@ -88,7 +106,7 @@ module Order =
             for (KeyValue(asset, value)) in portfolio.PositionMap do
                 match Map.tryFind asset sellMap with
 
-                        // sell, explicit reason
+                        // sell for explicit reason
                     | Some reason ->
                         SellRequest.create
                             asset value.Quantity reason
@@ -97,7 +115,7 @@ module Order =
                     | None when buyMap.ContainsKey(asset) ->
                         ()
 
-                        // sell, to generate cash
+                        // sell to generate cash
                     | None when buyMap.Count > 0 ->
                         SellRequest.create
                             asset value.Quantity "Making room in portfolio."
@@ -187,22 +205,13 @@ module Order =
         }
 
     /// Buys assets using the given money.
-    let private placeBuyOrders broker assetReasons money =
+    let private placeBuyOrders broker assetPairs money =
         async {
-
-                // obtain price changes for the given assets
-            let! priceChangeResultTuples =
-                assetReasons
-                    |> Seq.map (fun (asset, reason) ->
-                        broker.GetPriceChange asset
-                            |> Async.map (fun result ->
-                                asset, reason, result))
-                    |> Async.Sequential
-
                 // handle errors
             let buyRequests, priceChangeErrors =
-                priceChangeResultTuples
-                    |> Array.partitionWith (fun (asset, reason, result) ->
+                assetPairs
+                    |> Seq.toArray
+                    |> Array.partitionWith (fun (asset, (reason, result)) ->
                         match result with
                             | Ok priceChangeOpt ->
                                 Choice1Of2 (
@@ -212,16 +221,6 @@ module Order =
                                 Choice2Of2 (
                                     OrderResult.create
                                         asset reason None (Error msg)))   // store price change error in order result
-
-                // don't buy assets with a negative price change
-            let buyRequests =
-                buyRequests
-                    |> Array.choose (fun req ->
-                        match req.PriceChangeOpt with
-                            | Some priceChange ->
-                                if priceChange >= 0m then Some req
-                                else None
-                            | None -> Some req)
 
                 // execute purchase
             let! buyResults = buyAssets broker buyRequests money
@@ -238,15 +237,22 @@ module Order =
                 // organize assets by trend (positive/negative)
             let buyMap, sellMap = getTrendMaps assessment
 
+                // apply price change filter
+            let! priceChangeMap = applyPriceChangeFilter broker buyMap.Keys
+            let buyMap =
+                priceChangeMap
+                    |> Map.map (fun asset result ->
+                        buyMap[asset], result)
+
                 // sell first to generate cash
             let! sellResults = placeSellOrders broker portfolio buyMap sellMap
             let cash = getSpendableCash portfolio sellResults
 
                 // buy assets with cash on hand
-            if buyMap.Count > 0 && cash > slush then   // don't try to spend a trivial amount
+            if cash > slush then   // don't try to spend a trivial amount
                 let! buyResults =
-                    let assetReasons = Map.toSeq buyMap
-                    placeBuyOrders broker assetReasons cash
+                    let assetPairs = Map.toSeq buyMap
+                    placeBuyOrders broker assetPairs cash
                 return sellResults, buyResults
             else
                 return sellResults, Array.empty
