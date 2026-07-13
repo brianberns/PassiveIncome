@@ -62,7 +62,7 @@ module Alpaca =
                 return Error exn.Message
         } |> Async.AwaitTask
 
-    /// Gets recent change in the given asset's price.
+    /// Gets recent percentage change in the given asset's price.
     let private getPriceChange api asset =
         task {
             try

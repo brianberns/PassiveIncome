@@ -57,6 +57,9 @@ module Order =
         lookup Trend.Positive,
         lookup Trend.Negative
 
+    /// Minimum acceptable price change percentage.
+    let private priceChangeThreshold = 0.1m
+
     /// Applies a price change filter to the given assets.
     let private applyPriceChangeFilter broker assets =
         async {
@@ -66,11 +69,13 @@ module Order =
                     |> Seq.map broker.GetPriceChange
                     |> Async.Sequential
 
-                // filter out assets with a negative price change
+                // filter out assets with insufficent price changes
             return Seq.zip assets results
                 |> Seq.where (fun (_, result) ->
                     match result with
-                        | Ok (Some change) when change < 0m -> false
+                        | Ok (Some change)
+                            when change < priceChangeThreshold ->
+                            false
                         | _ -> true)
                 |> Map
         }

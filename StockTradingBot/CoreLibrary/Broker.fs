@@ -42,7 +42,7 @@ type Broker =
         IsMarketOpen :
             unit -> Async<Result<bool, string (*message*)>>
 
-        /// Gets recent change in the given asset's price.
+        /// Gets recent percentage change in the given asset's price.
         GetPriceChange :
             Asset -> Async<PriceChangeResult>
 
