@@ -13,7 +13,7 @@ open Fable.Remoting.Suave
 
 module Api =
 
-    let private capacity = 10
+    let private capacity = 40
 
     /// Run results in chronological order (i.e. oldest first).
     let private runResults = LinkedList<RunResult>()
