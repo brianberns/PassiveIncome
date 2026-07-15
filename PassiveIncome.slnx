@@ -5,6 +5,10 @@
     <Project Path="Fable.Remoting.Suave/Fable.Remoting.Server/Fable.Remoting.Server.fsproj" />
     <Project Path="Fable.Remoting.Suave/Fable.Remoting.Suave/Fable.Remoting.Suave.fsproj" />
   </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+  </Folder>
   <Folder Name="/StockTradingBot/">
     <Project Path="StockTradingBot/ConsoleApp/StockTradingBotConsole.fsproj" />
     <Project Path="StockTradingBot/CoreLibrary/StockTradingBot.fsproj" />
