@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Alpaca.Markets" Version="7.2.2" />
     <PackageReference Include="FSharp.Control.AsyncSeq" Version="4.15.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
@@ -31,7 +32,6 @@
   </ItemGroup>
 
   <ItemGroup>
-	<ProjectReference Include="..\..\..\alpaca-trade-api-csharp\Alpaca.Markets\Alpaca.Markets.csproj" />
 	<ProjectReference Include="..\..\..\Fable.Remoting.Suave\Fable.Remoting.Suave\Fable.Remoting.Suave.fsproj" />
     <ProjectReference Include="..\..\CoreLibrary\StockTradingBot.fsproj">
       <ExcludeAssets>runtime</ExcludeAssets>

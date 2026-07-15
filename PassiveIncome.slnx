@@ -18,5 +18,4 @@
     <Project Path="StockTradingBot/WebApp/Harness/StockTradingBotHarness.fsproj" />
     <Project Path="StockTradingBot/WebApp/Server/StockTradingBotServer.fsproj" />
   </Folder>
-  <Project Path="alpaca-trade-api-csharp/Alpaca.Markets/Alpaca.Markets.csproj" />
 </Solution>
