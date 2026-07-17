@@ -6,7 +6,7 @@ open Fable.Remoting.Client
 module Remoting =
 
     /// Prefix routes with /StockTradingBot.
-    let routeBuilder typeName methodName = 
+    let routeBuilder typeName methodName =
         sprintf "/StockTradingBot/%s/%s" typeName methodName
 
     /// Server API.
