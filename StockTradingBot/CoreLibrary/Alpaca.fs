@@ -67,6 +67,8 @@ module Alpaca =
         task {
             try
                     // get latest price
+                let! _ignore =
+                    api.TradingClient.GetAssetAsync(asset.Symbol)   // improve error message for unknown symbol
                 let! latest =
                     LatestMarketDataRequest(asset.Symbol)
                         |> api.DataClient.GetLatestTradeAsync
