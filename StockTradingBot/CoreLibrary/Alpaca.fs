@@ -95,6 +95,13 @@ module Alpaca =
                 return Error exn.Message
         } |> Async.AwaitTask
 
+    /// Amount of time to wait once for an order to fill.
+    let private waitTimeMs = 500
+
+    /// The maximum number of times to wait for an order to
+    /// fill.
+    let private maxNumWaits = 60
+
     /// Waits a while (but not forever) for the given order
     /// to fill, and then answers its average fill price
     /// and filled quantity.
@@ -102,7 +109,7 @@ module Alpaca =
 
         let rec loop n =
             task {
-                do! Task.Delay 500
+                do! Task.Delay waitTimeMs
                 let! order =
                     api.TradingClient.GetOrderAsync(orderId : Guid)
                 match order.OrderStatus with
@@ -126,7 +133,7 @@ module Alpaca =
                         return Error (Some status)
 
                         // try again?
-                    | _ when n < 25 ->
+                    | _ when n < maxNumWaits ->
                         return! loop (n + 1)
 
                         // give up waiting (order might still fill eventually)
