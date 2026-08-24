@@ -239,7 +239,7 @@ module Order =
             MarketAssessment.tryFindError assessment
                 |> Option.isNone)
         async {
-                // organize assets by trend (positive/negative)
+                // organize assets by trend (positive/negative) with reasons
             let buyMap, sellMap = getTrendMaps assessment
 
                 // apply price change filter to potential purchases
