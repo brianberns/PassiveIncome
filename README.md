@@ -97,9 +97,9 @@ Note that this contains only a summary of the actual news article, rather than i
 
 # Market assessment
 
-The next step was to feed these news items into an LLM and have it identify stocks of interest. The prompt I settled on was:
+The next step was to feed these news items into an LLM and have it identify stocks of interest. The prompt I settled on is:
 
-*As a savvy stock trader, scan the news items below for robust trends that are likely to persist over a period of hours or days. Assess the overall state of the market and then identify the specific US companies that are likely to trend positive or negative in the market and explain why. Return ONLY ticker symbols (not company names) for liquid US equities.*
+> As a savvy stock trader, scan the news items below for robust trends that are likely to persist over a period of hours or days. Assess the overall state of the market and then identify the specific US companies that are likely to trend positive or negative in the market and explain why. Return ONLY ticker symbols (not company names) for liquid US equities.
 
 I used a JSON schema to shape the response into a collection of assets that the LLM thinks are trending either positive or negative:
 
