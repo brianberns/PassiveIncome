@@ -2,17 +2,17 @@
 
 # Introduction
 
-I retired from professional software development last year, but still enjoy programming as much as ever. Since I don’t have a salary coming in anymore, I recently started wondering if I could write some software to generate passive income instead. This quickly led to the (not very original) idea of creating an AI agent that could make money in the stock market.
+I retired from professional software development last year, but still enjoy programming as much as ever. Since I don't have a salary coming in anymore, I recently started wondering if I could write some software to generate passive income instead. This quickly led to the (not very original) idea of creating an AI agent that could make money in the stock market.
 
-I don’t have much of a background in finance, but I thought that access to news about the world might give a stock-trading bot an advantage, just like it does for human traders. My hope was that financial trends based on real world news might persist for at least a few hours – long enough for a bot to leverage using consumer-grade AI. I knew this was a naive concept, but it seemed like a good starting point for a fun experiment, at least. The design in my head looked like this:
+I don't have much of a background in finance, but I thought that access to news about the world might give a stock-trading bot an advantage, just like it does for human traders. My hope was that financial trends based on real world news might persist for at least a few hours – long enough for a bot to leverage using consumer-grade AI. I knew this was a naive concept, but it seemed like a good starting point for a fun experiment, at least. The design in my head looked like this:
 
 ![Design diagram](./Images/Diagram.png)
 
 # Getting to work
 
-I’m an F# developer, so I wanted to find .NET libraries that would provide access to the three boxes in the above diagram. I was also looking to minimize subscription and transaction costs, in the hope of creating a bot that could generate enough income to pay for itself.
+I'm an F# developer, so I wanted to find .NET libraries that would provide access to the three boxes in the above diagram. I was also looking to minimize subscription and transaction costs, in the hope of creating a bot that could generate enough income to pay for itself.
 
-A library that reads RSS feeds is available from Microsoft via System.ServiceModel.Syndication, so that part was easy. I was also familiar with LLM API’s from previous projects. But how could I get data about stocks (e.g. ticker prices) and make trades from a .NET application? A few web searches led me directly to [Alpaca’s C# SDK](https://www.nuget.org/packages/Alpaca.Markets/). It seemed perfect: My bot could easily get whatever ticker data it needed, and then make trades based on its conclusions, all without cost.
+A library that reads RSS feeds is available from Microsoft via System.ServiceModel.Syndication, so that part was easy. I was also familiar with LLM API's from previous projects. But how could I get data about stocks (e.g. ticker prices) and make trades from a .NET application? A few web searches led me directly to [Alpaca's C# SDK](https://www.nuget.org/packages/Alpaca.Markets/). It seemed perfect: My bot could easily get whatever ticker data it needed, and then make trades based on its conclusions, all without cost.
 
 # News feeds
 
@@ -20,7 +20,7 @@ Free RSS news feeds are easy to come by, although they are all delayed by at lea
 
 | Name | URL | Comment |
 | :---- | :---- | :---- |
-| MarketWatch<br />Top Stories | https://feeds.content.dowjones.io/public/rss/mw_topstories | Financial news (including personal finance stories that aren’t relevant here) |
+| MarketWatch<br />Top Stories | https://feeds.content.dowjones.io/public/rss/mw_topstories | Financial news (including personal finance stories that aren't relevant here) |
 | CNBC<br />Top News | https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114 | U.S. news |
 | CNBC<br />Finance | https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664 | Financial news |
 | Yahoo<br />S&P 500 | https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US | Financial news |
@@ -76,7 +76,7 @@ let getItemsAsync (httpClient : HttpClient) newsFeed =
     } |> Async.AwaitTask
 ```
 
-This is an asynchronous function that returns an error value if something goes wrong, rather than throwing an exception. Representing failures like this forces the caller to handle the error explicitly, which means the program won’t crash due to an unhandled exception.
+This is an asynchronous function that returns an error value if something goes wrong, rather than throwing an exception. Representing failures like this forces the caller to handle the error explicitly, which means the program won't crash due to an unhandled exception.
 
 A typical news item is:
 
@@ -100,6 +100,8 @@ Note that this contains only a summary of the actual news article, rather than i
 The next step was to feed these news items into an LLM and have it identify stocks of interest. The prompt I settled on is:
 
 > As a savvy stock trader, scan the news items below for robust trends that are likely to persist over a period of hours or days. Assess the overall state of the market and then identify the specific US companies that are likely to trend positive or negative in the market and explain why. Return ONLY ticker symbols (not company names) for liquid US equities.
+
+Note that this assumes that the LLM cam map a company's name to its stock symbol without assistance. In practice, this seems to be true, except for occasional outliers (e.g. companies that have recently changed their symbol).
 
 I used a JSON schema to shape the response into a collection of assets that the LLM thinks are trending either positive or negative:
 
@@ -136,7 +138,7 @@ and Trend =
     | Negative = 1
 ```
 
-Note that this records the LLM’s prediction of each stock’s trend going forward, which may be very different from the stock’s actual trend up to this point.
+Note that this records the LLM's prediction of each stock's trend going forward, which may be very different from the stock's actual trend up to this point.
 
 A typical market assessment might look like this:
 
@@ -178,9 +180,9 @@ A typical market assessment might look like this:
 
 With a market assessment in hand, the agent could then use data from Alpaca to decide which stocks to buy and sell. I designed a simple algorithm:
 
-* Group predicted positive-trending stocks together into a “might buy” group and predicted negative-trending stocks together into a “might sell” group.  
-* From the might-buy group, eliminate stocks that have not increased in price by at least 0.1% in the last hour. This ensures that the actual trend aligns with the predicted trend, at least to some extent, before pulling the trigger on a purchase. (Note that ticker data is delayed by 15 minutes on Alpaca’s free tier.)  
-* For each asset in the bot’s current portfolio:  
+* Group predicted positive-trending stocks together into a "might buy" group and predicted negative-trending stocks together into a "might sell" group.  
+* From the might-buy group, eliminate stocks that have not increased in price by at least 0.1% in the last hour. This ensures that the actual trend aligns with the predicted trend, at least to some extent, before pulling the trigger on a purchase. (Note that ticker data is delayed by 15 minutes on Alpaca's free tier.)  
+* For each asset in the bot's current portfolio:  
   * If it is in the might-sell group, sell it  
   * Else if it is in the might-buy group, keep it  
   * Else if there are are any stocks in the might-buy group, sell it to generate cash  
@@ -194,7 +196,7 @@ let placeOrders broker portfolio assessment =
     …   // implementation omitted for brevity
 ```
 
-One entertaining, but possibly unwise, characteristic of this algorithm is that it churns assets frequently. It usually sells the bot’s entire portfolio any time it wants to buy anything. While this is certainly not a conventional strategy, it’s consistent with the idea of exploiting short-term trends that last only a few hours.
+One entertaining, but possibly unwise, characteristic of this algorithm is that it churns assets frequently. It usually sells the bot's entire portfolio any time it wants to buy anything. While this is certainly not a conventional strategy, it's consistent with the idea of exploiting short-term trends that last only a few hours.
 
 ## Alpaca broker
 
@@ -214,15 +216,15 @@ type Api =
     }
 ```
 
-And defined five fundamental functions that use this API to act as a “broker” for buying and selling stocks:
+And defined five fundamental functions that use this API to act as a "broker" for buying and selling stocks:
 
 * **getPortfolio**: Gets the current portfolio.  
 * **isMarketOpen**: Indicates whether the market is currently open.  
-* **getPriceChange**: Gets recent percentage change in a given asset’s price.  
+* **getPriceChange**: Gets recent percentage change in a given asset's price.  
 * **sell**: Sells a given quantity of a given asset.  
 * **buy**: Buys a given asset with the given money.
 
-The functions share a common pattern of taking an Api instance as input and returning an F# `Async<Result<’T, string>>` type that contains either the desired data (of type ’T) or an error message if something went wrong. Again, this error handling pattern prevents an exception from bringing down the entire program. For example, here is the implementation of isMarketOpen:
+The functions share a common pattern of taking an Api instance as input and returning an F# `Async<Result<'T, string>>` type that contains either the desired data (of type 'T) or an error message if something went wrong. Again, this error handling pattern prevents an exception from bringing down the entire program. For example, here is the implementation of isMarketOpen:
 
 ```fsharp
 /// Is the market currently open?  
@@ -288,7 +290,7 @@ let buy api asset (Usd usd) =
     }
 ```
 
-One interesting tidbit I learned while debugging this function is that Alpaca doesn’t let you spend fractions of a cent, so I had to truncate the money spent to two decimal places. These sort of “business rules” are usually easy to bake into the broker implementation where needed.
+One interesting tidbit I learned while debugging this function is that Alpaca doesn't let you spend fractions of a cent, so I had to truncate the money spent to two decimal places. These sort of "business rules" are usually easy to bake into the broker implementation where needed.
 
 # Running the bot
 
@@ -356,7 +358,7 @@ type IStockTradingBotApi =
     }
 ```
 
-This makes it easy to consume the stock trading API from an F# [Fable](https://fable.io/) client using a pure functional “[Elmish](https://elmish.github.io/elmish/)” architecture. The client just has to render the run results in a readable way, but since I’m more of a back-end developer (and allergic to CSS in particular), I decided to let Claude Code write the front end for me. [Feliz](https://fable-hub.github.io/Feliz/) provides React-based DSL to declare HTML elements needed at runtime. For example, rendering a RunResult is done as follows:
+This makes it easy to consume the stock trading API from an F# [Fable](https://fable.io/) client using a pure functional "[Elmish](https://elmish.github.io/elmish/)" architecture. The client just has to render the run results in a readable way, but since I'm more of a back-end developer (and allergic to CSS in particular), I decided to let Claude Code write the front end for me. [Feliz](https://fable-hub.github.io/Feliz/) provides React-based DSL to declare HTML elements needed at runtime. For example, rendering a RunResult is done as follows:
 
 ```fsharp
 open Feliz
@@ -413,10 +415,10 @@ As of this writing, the stock trading bot is up about 10% since it started runni
 
 ![Results](./Images/Results.png)
 
-However, the value of the portfolio has see-sawed quite a bit over that time, rather than exhibiting a steady trend, which is probably to be expected given the agent’s tendency to churn. Since all of the transactions go through the Alpaca API, I’m able to use my Alpaca dashboard to analyze every trade. However, the bot’s web site is the only place where the *reasoning* behind those transactions is currently kept.
+However, the value of the portfolio has see-sawed quite a bit over that time, rather than exhibiting a steady trend, which is probably to be expected given the agent's tendency to churn. Since all of the transactions go through the Alpaca API, I'm able to use my Alpaca dashboard to analyze every trade. However, the bot's web site is the only place where the *reasoning* behind those transactions is currently kept.
 
-I consider the project a success so far, because it has demonstrated the viability of integrating news feeds with stock purchases via generative AI and shown occasional hints of competence. However, I probably wouldn’t trust it with any real money quite yet – beating the market over the long run is notoriously difficult, even for human experts with access to real-time data. If I were to push forward with the idea, here are the areas I would focus on improving next:
+I consider the project a success so far, because it has demonstrated the viability of integrating news feeds with stock purchases via generative AI and shown occasional hints of competence. However, I probably wouldn't trust it with any real money quite yet – beating the market over the long run is notoriously difficult, even for human experts with access to real-time data. If I were to push forward with the idea, here are the areas I would focus on improving next:
 
 * Send the full content of news items to the LLM, rather than just the headlines and summaries.  
-* Send historical “bars” from Alpaca to the LLM for stocks of interest to the LLM. Right now, the LLM has no insight into how the assets have performed over time, and is simply reacting to news feeds alone.  
+* Send historical "bars" from Alpaca to the LLM for stocks of interest to the LLM. Right now, the LLM has no insight into how the assets have performed over time, and is simply reacting to news feeds alone.  
 * Reduce churn by holding onto stocks that are performing well, even if they are no longer in the news.
