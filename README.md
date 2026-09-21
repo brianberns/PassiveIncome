@@ -10,9 +10,9 @@ I don’t have much of a background in finance, but I thought that access to new
 
 # Getting to work
 
-I’m an F\# developer, so I wanted to find .NET libraries that would provide access to the three boxes in the above diagram. I was also looking to minimize subscription and transaction costs, in the hope of creating a bot that could generate enough income to pay for itself.
+I’m an F# developer, so I wanted to find .NET libraries that would provide access to the three boxes in the above diagram. I was also looking to minimize subscription and transaction costs, in the hope of creating a bot that could generate enough income to pay for itself.
 
-A library that reads RSS feeds is available from Microsoft via System.ServiceModel.Syndication, so that part was easy. I was also familiar with LLM API’s from previous projects. But how could I get data about stocks (e.g. ticker prices) and make trades from a .NET application? A few web searches led me directly to [Alpaca’s C\# SDK](https://www.nuget.org/packages/Alpaca.Markets/). It seemed perfect: My bot could easily get whatever ticker data it needed, and then make trades based on its conclusions, all without cost.
+A library that reads RSS feeds is available from Microsoft via System.ServiceModel.Syndication, so that part was easy. I was also familiar with LLM API’s from previous projects. But how could I get data about stocks (e.g. ticker prices) and make trades from a .NET application? A few web searches led me directly to [Alpaca’s C# SDK](https://www.nuget.org/packages/Alpaca.Markets/). It seemed perfect: My bot could easily get whatever ticker data it needed, and then make trades based on its conclusions, all without cost.
 
 # News feeds
 
@@ -25,7 +25,7 @@ Free RSS news feeds are easy to come by, although they are all delayed by at lea
 | CNBC<br />Finance | https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664 | Financial news |
 | Yahoo<br />S&P 500 | https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US | Financial news |
 
-I defined an F\# news feed type like this:
+I defined an F# news feed type like this:
 
 ```fsharp
 /// RSS news feed.  
@@ -80,7 +80,7 @@ This is an asynchronous function that returns an error value if something goes w
 
 A typical news item is:
 
-```
+```json
 {  
   Id = "108353087"  
   PublishDate = 8/24/2026 8:21:17 AM +00:00  
@@ -140,7 +140,7 @@ Note that this records the LLM’s prediction of each stock’s trend going forw
 
 A typical market assessment might look like this:
 
-```
+```json
 {  
   State =  
    "The US market is currently exhibiting a divergence where the Dow  
@@ -222,7 +222,7 @@ And defined five fundamental functions that use this API to act as a “broker�
 * **sell**: Sells a given quantity of a given asset.  
 * **buy**: Buys a given asset with the given money.
 
-The functions share a common pattern of taking an Api instance as input and returning an F\# Async<Result<’T, string>> type that contains either the desired data (of type ’T) or an error message if something went wrong. Again, this error handling pattern prevents an exception from bringing down the entire program. For example, here is the implementation of isMarketOpen:
+The functions share a common pattern of taking an Api instance as input and returning an F# `Async<Result<’T, string>>` type that contains either the desired data (of type ’T) or an error message if something went wrong. Again, this error handling pattern prevents an exception from bringing down the entire program. For example, here is the implementation of isMarketOpen:
 
 ```fsharp
 /// Is the market currently open?  
@@ -330,9 +330,11 @@ type RunResult =
 /// Runs once using the given context.  
 let runOne context : Async<RunResult> =  
     …   // implementation omitted for brevity
+```
 
-We actually want the bot the bot to run indefinitely every N minutes, which we can do with an F\# asyncSeq:
+We actually want the bot to run indefinitely every N minutes, which we can do with an F# asyncSeq:
 
+```fsharp
 /// Runs in an infinite loop using the given context.  
 let runLoop context delay : AsyncSeq<RunResult> =  
     asyncSeq {  
@@ -345,7 +347,7 @@ let runLoop context delay : AsyncSeq<RunResult> =
 
 # Stock trading web site
 
-Sticking with the F\# theme, I wanted to run the bot on a [Suave](https://suave.io/) web server using [Fable remoting](https://zaid-ajaj.github.io/Fable.Remoting/). The server component hosting the bot exposes a simple API that returns all the results accumulated so far:
+Sticking with the F# theme, I wanted to run the bot on a [Suave](https://suave.io/) web server using [Fable remoting](https://zaid-ajaj.github.io/Fable.Remoting/). The server component hosting the bot exposes a simple API that returns all the results accumulated so far:
 
 ```fsharp
 type IStockTradingBotApi =  
@@ -354,7 +356,7 @@ type IStockTradingBotApi =
     }
 ```
 
-This makes it easy to consume the stock trading API from an F\# [Fable](https://fable.io/) client using a pure functional “[Elmish](https://elmish.github.io/elmish/)” architecture. The client just has to render the run results in a readable way, but since I’m more of a back-end developer (and allergic to CSS in particular), I decided to let Claude Code write the front end for me. [Feliz](https://fable-hub.github.io/Feliz/) provides React-based DSL to declare HTML elements needed at runtime. For example, rendering a RunResult is done as follows:
+This makes it easy to consume the stock trading API from an F# [Fable](https://fable.io/) client using a pure functional “[Elmish](https://elmish.github.io/elmish/)” architecture. The client just has to render the run results in a readable way, but since I’m more of a back-end developer (and allergic to CSS in particular), I decided to let Claude Code write the front end for me. [Feliz](https://fable-hub.github.io/Feliz/) provides React-based DSL to declare HTML elements needed at runtime. For example, rendering a RunResult is done as follows:
 
 ```fsharp
 open Feliz
@@ -407,7 +409,7 @@ All the source code is available on [GitHub](https://github.com/brianberns/Passi
 
 # Results so far
 
-As of this writing, the stock trading bot is up about 10% since it started running with $1000 in paper money last month (vs \+1.0% for the Dow Jones over the same period):
+As of this writing, the stock trading bot is up about 10% since it started running with $1000 in paper money last month (vs +1.0% for the Dow Jones over the same period):
 
 ![Results](./Images/Results.png)
 
