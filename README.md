@@ -20,8 +20,7 @@ Free RSS news feeds are easy to come by, although they are all delayed by at lea
 
 | Name | URL | Comment |
 | :---- | :---- | :---- |
-| MarketWatch<br />Top Stories | https://feeds.content.dowjones.io/public/rss/mw_topstories
- | Financial news (including personal finance stories that aren’t relevant here) |
+| MarketWatch<br />Top Stories | https://feeds.content.dowjones.io/public/rss/mw_topstories | Financial news (including personal finance stories that aren’t relevant here) |
 | CNBC<br />Top News | https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114 | U.S. news |
 | CNBC<br />Finance | https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664 | Financial news |
 | Yahoo<br />S&P 500 | https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=en-US | Financial news |
